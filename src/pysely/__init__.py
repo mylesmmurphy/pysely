@@ -7,6 +7,8 @@ from .dialect import (
     PostgresDialect,
     SqliteDialect,
 )
+from .dialect.mysql import MysqlDriver
+from .dialect.postgres import PostgresDriver
 from .errors import (
     ClosedClientError,
     InvalidQueryError,
@@ -43,9 +45,11 @@ __all__ = [
     "InvalidQueryError",
     "MssqlDialect",
     "MysqlDialect",
+    "MysqlDriver",
     "NoResultError",
     "PGliteDialect",
     "PostgresDialect",
+    "PostgresDriver",
     "Pysely",
     "PyselyError",
     "QueryPlugin",

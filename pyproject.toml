@@ -19,6 +19,8 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+mysql = ["asyncmy>=0.2,<1"]
+postgres = ["asyncpg>=0.30,<1"]
 sqlite = ["aiosqlite>=0.20,<1"]
 
 [dependency-groups]

@@ -91,5 +91,41 @@
     "portable_typing_status": "verified",
     "tests": ["test/runtime/test_plugins.py"],
     "difference": null
+  },
+  {
+    "id": "driver.postgres.pool_lifecycle",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/dialect/postgres/postgres-driver.ts",
+    "upstream_tests": [
+      "test/node/src/execute.test.ts",
+      "test/node/src/transaction.test.ts"
+    ],
+    "pysely_api": "PostgresDriver",
+    "dialect_support": {
+      "postgres": true
+    },
+    "runtime_status": "implemented_unverified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": ["test/driver/test_postgres_driver.py"],
+    "difference": null
+  },
+  {
+    "id": "driver.mysql.pool_lifecycle",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/dialect/mysql/mysql-driver.ts",
+    "upstream_tests": [
+      "test/node/src/execute.test.ts",
+      "test/node/src/transaction.test.ts"
+    ],
+    "pysely_api": "MysqlDriver",
+    "dialect_support": {
+      "mysql": true
+    },
+    "runtime_status": "implemented_unverified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": ["test/driver/test_mysql_driver.py"],
+    "difference": null
   }
 ]

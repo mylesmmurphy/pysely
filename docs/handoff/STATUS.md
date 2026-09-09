@@ -2,7 +2,7 @@
 
 Baseline commit: `c54987f4d5bb1a9573c8d83e1cba7365770cc016`
 
-Current project commit: `ca13e80`
+Current project commit: `4e25d53`
 
 Current stage: 2 - Execution
 
@@ -23,15 +23,18 @@ Current stage: 2 - Execution
 - PostgreSQL/SQLite returning, MSSQL output, and unsupported-feature validation.
 - Live SQLite writes with commit and rollback behavior.
 - Ordered query and result plugin execution.
+- Asyncpg and asyncmy pool adapters with lazy optional imports.
+- Owned and borrowed PostgreSQL/MySQL pool lifecycles and transaction pinning.
 
 ## Implemented but unverified
 
+- PostgreSQL and MySQL adapters have protocol-level tests but still need live engine
+  verification.
 - Exact projected-row inference; portable typing is intentionally conservative.
 
 ## Remaining parity gaps
 
 - The public export and test-case inventory is in progress.
-- PostgreSQL and MySQL runtime drivers are next in stage 2.
 - MSSQL and PGlite runtime drivers are scheduled as stage 2 fast-follows.
 - Joins, advanced expressions, CTEs, set operations, DDL, and other SQL surface
   features remain planned.
@@ -40,7 +43,10 @@ Current stage: 2 - Execution
 
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest -q`: 28 passed, no skips or xfails, including live SQLite.
+- `uv run pytest -q`: 35 passed and 2 service-dependent skips; live SQLite ran.
+- PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
+- `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
+  and aiosqlite 0.22.1.
 - `uv run mypy src/pysely test/fixtures/generated.py`: passed.
 - `uv run mypy --strict test/typings/portable.py`: passed.
 - `uv run pyright src/pysely test/typings/portable.py`: passed.
@@ -55,8 +61,8 @@ Current stage: 2 - Execution
 
 ## Next session
 
-1. Implement asyncpg and asyncmy pool adapters against the driver protocol.
-2. Add connection ownership and failure-path tests for both pools.
+1. Confirm PostgreSQL and MySQL service-backed CI results.
+2. Add connection failure, cancellation, and discard behavior for both pools.
 3. Add MSSQL, then validate a maintained PGlite Python runtime integration.
 4. Add expression grouping, reference comparisons, ordering, limits, and joins.
 5. Prove the hard portable typing fixtures before starting the mypy plugin.

@@ -18,6 +18,7 @@ query = (
 compiled = query.compile()
 ```
 
-Install SQLite execution support with `pysely[sqlite]`.
+Install driver support with `pysely[postgres]`, `pysely[mysql]`, or
+`pysely[sqlite]`.
 
 See `docs/ROADMAP.md` for implementation stages and current acceptance targets.
