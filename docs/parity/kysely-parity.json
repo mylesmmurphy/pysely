@@ -1,0 +1,53 @@
+[
+  {
+    "id": "select.explicit_projection.where",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-builder/select-query-builder.ts",
+    "upstream_tests": ["test/node/src/select.test.ts", "test/node/src/where.test.ts"],
+    "pysely_api": "SelectQueryBuilder.select",
+    "dialect_support": {
+      "postgres": true,
+      "mysql": true,
+      "sqlite": true,
+      "mssql": true
+    },
+    "runtime_status": "implemented_unverified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": ["test/compiler/test_select.py"],
+    "difference": null
+  },
+  {
+    "id": "dialect.pglite.compiler",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/dialect/pglite/pglite-dialect.ts",
+    "upstream_tests": ["test/node/src/select.test.ts"],
+    "pysely_api": "PGliteDialect",
+    "dialect_support": {
+      "pglite": true
+    },
+    "runtime_status": "planned",
+    "mypy_status": "planned",
+    "portable_typing_status": "implemented_unverified",
+    "tests": ["test/compiler/test_select.py"],
+    "difference": "Compiler support precedes the fast-follow Python runtime adapter."
+  },
+  {
+    "id": "execution.select.sqlite",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-executor/default-query-executor.ts",
+    "upstream_tests": [
+      "test/node/src/execute.test.ts",
+      "test/node/src/transaction.test.ts"
+    ],
+    "pysely_api": "SelectQueryBuilder.execute",
+    "dialect_support": {
+      "sqlite": true
+    },
+    "runtime_status": "verified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": ["test/runtime/test_sqlite_execution.py"],
+    "difference": null
+  }
+]

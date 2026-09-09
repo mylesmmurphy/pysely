@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/kysely-org/kysely",
+  "commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+  "version": "0.29.5",
+  "runtime_test_files": 51,
+  "typing_test_files": 30,
+  "inventory_status": "in_progress"
+}
+
