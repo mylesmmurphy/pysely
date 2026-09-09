@@ -1,0 +1,43 @@
+[project]
+site_name = "Pysely"
+site_url = "https://pysely.dev"
+site_description = "An async-first, typed Python SQL query builder inspired by Kysely."
+site_author = "Myles Murphy"
+repo_url = "https://github.com/mylesmmurphy/pysely"
+repo_name = "mylesmmurphy/pysely"
+edit_uri = "edit/main/docs/"
+copyright = "Copyright © 2026 Myles Murphy"
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = "getting-started.md" },
+  { "Queries" = "queries.md" },
+  { "Dialects" = "dialects.md" },
+  { "Project status" = "project-status.md" },
+]
+
+[project.theme]
+features = [
+  "content.action.edit",
+  "content.action.view",
+  "content.code.copy",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "toc.follow",
+]
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"

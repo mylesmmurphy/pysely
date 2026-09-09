@@ -11,7 +11,7 @@ __pycache__/
 build/
 dist/
 htmlcov/
+site/
 .env
 .envrc
 .pypirc
-
