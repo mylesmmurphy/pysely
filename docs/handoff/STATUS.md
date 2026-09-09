@@ -2,7 +2,7 @@
 
 Baseline commit: `c54987f4d5bb1a9573c8d83e1cba7365770cc016`
 
-Current project commit: `4e25d53`
+Current project commit: `2f39648`
 
 Current stage: 2 - Execution
 
@@ -25,11 +25,10 @@ Current stage: 2 - Execution
 - Ordered query and result plugin execution.
 - Asyncpg and asyncmy pool adapters with lazy optional imports.
 - Owned and borrowed PostgreSQL/MySQL pool lifecycles and transaction pinning.
+- Live PostgreSQL 16.4 and MySQL 8.4 read, write, and rollback verification in CI.
 
 ## Implemented but unverified
 
-- PostgreSQL and MySQL adapters have protocol-level tests but still need live engine
-  verification.
 - Exact projected-row inference; portable typing is intentionally conservative.
 
 ## Remaining parity gaps
@@ -45,6 +44,7 @@ Current stage: 2 - Execution
 - `uv run ruff format --check .`: passed.
 - `uv run pytest -q`: 35 passed and 2 service-dependent skips; live SQLite ran.
 - PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
+- GitHub Actions run `34409360952`: PostgreSQL, MySQL, and all core matrix jobs passed.
 - `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
   and aiosqlite 0.22.1.
 - `uv run mypy src/pysely test/fixtures/generated.py`: passed.
@@ -61,8 +61,7 @@ Current stage: 2 - Execution
 
 ## Next session
 
-1. Confirm PostgreSQL and MySQL service-backed CI results.
-2. Add connection failure, cancellation, and discard behavior for both pools.
-3. Add MSSQL, then validate a maintained PGlite Python runtime integration.
-4. Add expression grouping, reference comparisons, ordering, limits, and joins.
-5. Prove the hard portable typing fixtures before starting the mypy plugin.
+1. Add connection failure, cancellation, and discard behavior for both pools.
+2. Add MSSQL, then validate a maintained PGlite Python runtime integration.
+3. Add expression grouping, reference comparisons, ordering, limits, and joins.
+4. Prove the hard portable typing fixtures before starting the mypy plugin.
