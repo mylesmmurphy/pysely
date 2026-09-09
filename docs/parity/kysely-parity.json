@@ -133,5 +133,42 @@
       "test/runtime/test_mysql_live.py"
     ],
     "difference": null
+  },
+  {
+    "id": "execution.connection_scope",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/kysely.ts",
+    "upstream_tests": ["test/node/src/connection.test.ts"],
+    "pysely_api": "Pysely.connection",
+    "dialect_support": {
+      "postgres": true,
+      "mysql": true,
+      "sqlite": true
+    },
+    "runtime_status": "implemented_unverified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": ["test/driver/test_postgres_driver.py"],
+    "difference": "Python uses an async context manager instead of a callback."
+  },
+  {
+    "id": "transaction.failure_cleanup",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/kysely.ts",
+    "upstream_tests": ["test/node/src/transaction.test.ts"],
+    "pysely_api": "Pysely.transaction",
+    "dialect_support": {
+      "postgres": true,
+      "mysql": true,
+      "sqlite": true
+    },
+    "runtime_status": "verified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": [
+      "test/driver/test_postgres_driver.py",
+      "test/runtime/test_sqlite_execution.py"
+    ],
+    "difference": "Python uses an async context manager instead of a callback."
   }
 ]

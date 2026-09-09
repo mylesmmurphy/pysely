@@ -75,6 +75,9 @@ class Pysely(Generic[DatabaseT]):
     def transaction(self) -> TransactionContext[DatabaseT]:
         return TransactionContext(self._executor)
 
+    def connection(self) -> ConnectionContext[DatabaseT]:
+        return ConnectionContext(self._executor)
+
     async def destroy(self) -> None:
         await self._executor.destroy()
 
@@ -112,9 +115,39 @@ class TransactionContext(Generic[DatabaseT]):
             return
         try:
             if exc_type is None:
-                await connection.commit()
+                try:
+                    await connection.commit()
+                except BaseException:
+                    await connection.rollback()
+                    raise
             else:
                 await connection.rollback()
         finally:
             await driver.release_connection(connection)
+            self._connection = None
+
+
+class ConnectionContext(Generic[DatabaseT]):
+    def __init__(self, executor: QueryExecutor) -> None:
+        self._executor = executor
+        self._connection: DatabaseConnection | None = None
+
+    async def __aenter__(self) -> Pysely[DatabaseT]:
+        driver = self._executor.driver
+        if driver is None:
+            raise RuntimeError("Connection scopes require a configured driver")
+        await driver.init()
+        self._connection = await driver.acquire_connection()
+        return Pysely[DatabaseT].from_executor(
+            self._executor.with_connection(self._connection)
+        )
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        driver = self._executor.driver
+        connection = self._connection
+        if driver is None or connection is None:
+            return
+        try:
+            await driver.release_connection(connection)
+        finally:
             self._connection = None

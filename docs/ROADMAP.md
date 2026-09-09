@@ -14,11 +14,9 @@ binding profiles, and the generated fixture passes mypy and Pyright.
 - Driver and connection protocols, plugin pipeline, result types, and SQLite driver.
 - Async execution, connection ownership, transactions, savepoints, and cleanup.
 - PostgreSQL and MySQL adapters with live CI wiring.
-- MSSQL and PGlite runtime adapters as fast-follows within this stage.
 
 Exit: parameterized queries and transaction failure paths pass against PostgreSQL,
-MySQL, SQLite, MSSQL, and PGlite. PGlite must use a maintained Python integration;
-its PostgreSQL compiler parity alone does not satisfy the runtime gate.
+MySQL, and SQLite.
 
 ## Stage 3: SQL surface
 
@@ -35,3 +33,8 @@ Exit: every applicable upstream behavior has runtime, compiler, and typing evide
 - Close the parity ledger and production release gates.
 
 Exit: all release acceptance criteria in the architecture handoff are evidenced.
+
+## Post-readiness dialect expansion
+
+- Add MSSQL and PGlite runtime adapters after the PostgreSQL, MySQL, and SQLite
+  production gates are complete.

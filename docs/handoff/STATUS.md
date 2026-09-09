@@ -2,7 +2,7 @@
 
 Baseline commit: `c54987f4d5bb1a9573c8d83e1cba7365770cc016`
 
-Current project commit: `2f39648`
+Current project commit: see repository `HEAD`
 
 Current stage: 2 - Execution
 
@@ -26,6 +26,7 @@ Current stage: 2 - Execution
 - Asyncpg and asyncmy pool adapters with lazy optional imports.
 - Owned and borrowed PostgreSQL/MySQL pool lifecycles and transaction pinning.
 - Live PostgreSQL 16.4 and MySQL 8.4 read, write, and rollback verification in CI.
+- Single-connection scopes and rollback after transaction body or commit failure.
 
 ## Implemented but unverified
 
@@ -34,7 +35,8 @@ Current stage: 2 - Execution
 ## Remaining parity gaps
 
 - The public export and test-case inventory is in progress.
-- MSSQL and PGlite runtime drivers are scheduled as stage 2 fast-follows.
+- MSSQL and PGlite runtime drivers are deferred until the primary dialects meet
+  production-readiness gates.
 - Joins, advanced expressions, CTEs, set operations, DDL, and other SQL surface
   features remain planned.
 
@@ -42,7 +44,7 @@ Current stage: 2 - Execution
 
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest -q`: 35 passed and 2 service-dependent skips; live SQLite ran.
+- `uv run pytest -q`: 38 passed and 2 service-dependent skips; live SQLite ran.
 - PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
 - GitHub Actions run `34409360952`: PostgreSQL, MySQL, and all core matrix jobs passed.
 - `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
@@ -61,7 +63,7 @@ Current stage: 2 - Execution
 
 ## Next session
 
-1. Add connection failure, cancellation, and discard behavior for both pools.
-2. Add MSSQL, then validate a maintained PGlite Python runtime integration.
-3. Add expression grouping, reference comparisons, ordering, limits, and joins.
-4. Prove the hard portable typing fixtures before starting the mypy plugin.
+1. Add expression grouping and reference comparisons.
+2. Add ordering, limits, and joins.
+3. Prove the hard portable typing fixtures before starting the mypy plugin.
+4. Keep MSSQL and PGlite runtime work deferred until production readiness.

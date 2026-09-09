@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
+
+import pytest
 
 from pysely import PostgresDialect, Pysely
 from test.fixtures.generated import users
@@ -9,6 +12,7 @@ from test.fixtures.generated import users
 class FakeConnection:
     def __init__(self) -> None:
         self.commands: list[tuple[str, tuple[object, ...]]] = []
+        self.fail_on: str | None = None
 
     async def fetch(self, sql: str, *parameters: object) -> list[Mapping[str, object]]:
         self.commands.append((sql, parameters))
@@ -16,6 +20,8 @@ class FakeConnection:
 
     async def execute(self, sql: str, *parameters: object) -> str:
         self.commands.append((sql, parameters))
+        if sql == self.fail_on:
+            raise RuntimeError(f"{sql} failed")
         if sql.startswith("insert"):
             return "INSERT 0 1"
         if sql.startswith("update"):
@@ -86,3 +92,49 @@ async def test_transaction_pins_one_pool_connection() -> None:
     assert pool.released == 1
     assert pool.connection.commands[0] == ("begin", ())
     assert pool.connection.commands[-1] == ("commit", ())
+
+
+async def test_connection_scope_pins_one_pool_connection() -> None:
+    pool = FakePool()
+    db = Pysely[object](dialect=PostgresDialect(pool=pool))
+
+    async with db.connection() as connection_db:
+        await connection_db.select_from(users).select(users.c.id).execute()
+        await connection_db.update_table(users).set({"nickname": "Ada"}).execute()
+
+    await db.destroy()
+
+    assert pool.acquired == 1
+    assert pool.released == 1
+
+
+async def test_commit_failure_rolls_back_and_releases_connection() -> None:
+    pool = FakePool()
+    pool.connection.fail_on = "commit"
+    db = Pysely[object](dialect=PostgresDialect(pool=pool))
+
+    with pytest.raises(RuntimeError, match="commit failed"):
+        async with db.transaction():
+            pass
+
+    assert [command[0] for command in pool.connection.commands] == [
+        "begin",
+        "commit",
+        "rollback",
+    ]
+    assert pool.released == 1
+
+
+async def test_cancellation_rolls_back_and_releases_connection() -> None:
+    pool = FakePool()
+    db = Pysely[object](dialect=PostgresDialect(pool=pool))
+
+    with pytest.raises(asyncio.CancelledError):
+        async with db.transaction():
+            raise asyncio.CancelledError
+
+    assert [command[0] for command in pool.connection.commands] == [
+        "begin",
+        "rollback",
+    ]
+    assert pool.released == 1
