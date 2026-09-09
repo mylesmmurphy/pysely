@@ -7,7 +7,12 @@ from uuid import uuid4
 
 from pysely.catalog import Table
 from pysely.errors import InvalidQueryError, NoResultError
-from pysely.expression import Expression, OperationExpression
+from pysely.expression import (
+    ComparisonOperator,
+    Expression,
+    OperationExpression,
+    compare_references,
+)
 from pysely.operation_node import (
     AndNode,
     DeleteQueryNode,
@@ -134,6 +139,14 @@ class UpdateQueryBuilder(Generic[InputT, ResultT]):
             self, _node=replace(self._node, where=_where(self._node.where, expression))
         )
 
+    def where_ref(
+        self,
+        left: OperationExpression,
+        operator: ComparisonOperator,
+        right: OperationExpression,
+    ) -> UpdateQueryBuilder[InputT, ResultT]:
+        return self.where(compare_references(left, operator, right))
+
     def returning(
         self, *expressions: OperationExpression
     ) -> UpdateQueryBuilder[InputT, list[dict[str, object]]]:
@@ -172,6 +185,14 @@ class DeleteQueryBuilder(Generic[ResultT]):
         return replace(
             self, _node=replace(self._node, where=_where(self._node.where, expression))
         )
+
+    def where_ref(
+        self,
+        left: OperationExpression,
+        operator: ComparisonOperator,
+        right: OperationExpression,
+    ) -> DeleteQueryBuilder[ResultT]:
+        return self.where(compare_references(left, operator, right))
 
     def returning(
         self, *expressions: OperationExpression

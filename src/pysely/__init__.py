@@ -16,7 +16,7 @@ from .errors import (
     PyselyError,
     UnsupportedFeatureError,
 )
-from .expression import AliasedExpression, Expression
+from .expression import AliasedExpression, Expression, and_, or_
 from .pysely import Pysely
 from .query_builder import (
     DeleteQueryBuilder,
@@ -59,4 +59,6 @@ __all__ = [
     "UnsupportedFeatureError",
     "UpdateQueryBuilder",
     "UpdateResult",
+    "and_",
+    "or_",
 ]

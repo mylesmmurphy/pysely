@@ -7,6 +7,8 @@ from pysely import (
     PostgresDialect,
     Pysely,
     SqliteDialect,
+    and_,
+    or_,
 )
 from test.fixtures.generated import users
 
@@ -86,3 +88,45 @@ def test_alias_rebinds_columns_without_mutating_table():
 
     assert compiled.sql == 'select "u"."id" from "public"."users" as "u"'
     assert users.c.id.source == "public.users"
+
+
+def test_boolean_groups_preserve_parentheses_and_binding_order():
+    db = Pysely[object](dialect=PostgresDialect())
+
+    compiled = (
+        db.select_from(users)
+        .select(users.c.id)
+        .where(
+            and_(
+                users.c.id.eq(1),
+                or_(
+                    users.c.email.eq("ada@example.com"),
+                    users.c.email.eq("grace@example.com"),
+                ),
+            )
+        )
+        .compile()
+    )
+
+    assert compiled.sql.endswith(
+        'where ("public"."users"."id" = $1 and '
+        '("public"."users"."email" = $2 or '
+        '"public"."users"."email" = $3))'
+    )
+    assert compiled.parameters == (1, "ada@example.com", "grace@example.com")
+
+
+def test_where_ref_compares_columns_without_binding_values():
+    db = Pysely[object](dialect=PostgresDialect())
+
+    compiled = (
+        db.select_from(users)
+        .select(users.c.id)
+        .where_ref(users.c.email, "!=", users.c.nickname)
+        .compile()
+    )
+
+    assert compiled.sql.endswith(
+        'where "public"."users"."email" != "public"."users"."nickname"'
+    )
+    assert compiled.parameters == ()

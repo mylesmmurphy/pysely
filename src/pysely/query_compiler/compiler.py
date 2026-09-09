@@ -13,6 +13,7 @@ from pysely.operation_node import (
     InsertQueryNode,
     IsNullNode,
     OperationNode,
+    OrNode,
     ReferenceNode,
     RootOperationNode,
     SelectAllNode,
@@ -184,6 +185,9 @@ class QueryCompiler:
             return f"{self._compile(node.expression)} {operator}"
         if isinstance(node, AndNode):
             expressions = " and ".join(self._compile(item) for item in node.expressions)
+            return f"({expressions})"
+        if isinstance(node, OrNode):
+            expressions = " or ".join(self._compile(item) for item in node.expressions)
             return f"({expressions})"
         if isinstance(node, SelectAllNode):
             if not node.table:

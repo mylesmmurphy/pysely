@@ -6,7 +6,12 @@ from uuid import uuid4
 
 from pysely.catalog import Table
 from pysely.errors import NoResultError
-from pysely.expression import Expression, OperationExpression
+from pysely.expression import (
+    ComparisonOperator,
+    Expression,
+    OperationExpression,
+    compare_references,
+)
 from pysely.operation_node import (
     AndNode,
     IdentifierNode,
@@ -75,6 +80,14 @@ class SelectQueryBuilder(Generic[RowT]):
         if self._node.where:
             predicate = AndNode((self._node.where, predicate))
         return replace(self, _node=replace(self._node, where=predicate))
+
+    def where_ref(
+        self,
+        left: OperationExpression,
+        operator: ComparisonOperator,
+        right: OperationExpression,
+    ) -> SelectQueryBuilder[RowT]:
+        return self.where(compare_references(left, operator, right))
 
     def compile(self) -> CompiledQuery[RowT]:
         compiled = self._executor.compile_query(self._node, self._query_id)

@@ -1,3 +1,19 @@
-from .expression import AliasedExpression, Expression, OperationExpression
+from .expression import (
+    AliasedExpression,
+    ComparisonOperator,
+    Expression,
+    OperationExpression,
+    and_,
+    compare_references,
+    or_,
+)
 
-__all__ = ["AliasedExpression", "Expression", "OperationExpression"]
+__all__ = [
+    "AliasedExpression",
+    "ComparisonOperator",
+    "Expression",
+    "OperationExpression",
+    "and_",
+    "compare_references",
+    "or_",
+]

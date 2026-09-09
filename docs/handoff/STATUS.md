@@ -27,6 +27,7 @@ Current stage: 2 - Execution
 - Owned and borrowed PostgreSQL/MySQL pool lifecycles and transaction pinning.
 - Live PostgreSQL 16.4 and MySQL 8.4 read, write, and rollback verification in CI.
 - Single-connection scopes and rollback after transaction body or commit failure.
+- Parenthesized boolean groups and basic column-reference comparisons.
 
 ## Implemented but unverified
 
@@ -44,7 +45,7 @@ Current stage: 2 - Execution
 
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest -q`: 38 passed and 2 service-dependent skips; live SQLite ran.
+- `uv run pytest -q`: 40 passed and 2 service-dependent skips; live SQLite ran.
 - PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
 - GitHub Actions run `34409360952`: PostgreSQL, MySQL, and all core matrix jobs passed.
 - `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
@@ -63,7 +64,6 @@ Current stage: 2 - Execution
 
 ## Next session
 
-1. Add expression grouping and reference comparisons.
-2. Add ordering, limits, and joins.
-3. Prove the hard portable typing fixtures before starting the mypy plugin.
-4. Keep MSSQL and PGlite runtime work deferred until production readiness.
+1. Add ordering, limits, and joins.
+2. Prove the hard portable typing fixtures before starting the mypy plugin.
+3. Keep MSSQL and PGlite runtime work deferred until production readiness.

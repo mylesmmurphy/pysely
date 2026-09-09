@@ -9,6 +9,7 @@ from .nodes import (
     InsertQueryNode,
     IsNullNode,
     OperationNode,
+    OrNode,
     ReferenceNode,
     SelectAllNode,
     SelectQueryNode,
@@ -55,6 +56,10 @@ class OperationNodeVisitor:
         self.visit(node.expression)
 
     def visit_AndNode(self, node: AndNode) -> None:
+        for expression in node.expressions:
+            self.visit(expression)
+
+    def visit_OrNode(self, node: OrNode) -> None:
         for expression in node.expressions:
             self.visit(expression)
 

@@ -170,5 +170,27 @@
       "test/runtime/test_sqlite_execution.py"
     ],
     "difference": "Python uses an async context manager instead of a callback."
+  },
+  {
+    "id": "expression.boolean_groups.where_ref.basic",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-builder/where-interface.ts",
+    "upstream_tests": ["test/node/src/where.test.ts"],
+    "pysely_api": "and_/or_/SelectQueryBuilder.where_ref",
+    "dialect_support": {
+      "postgres": true,
+      "mysql": true,
+      "sqlite": true,
+      "mssql": true,
+      "pglite": true
+    },
+    "runtime_status": "implemented_unverified",
+    "mypy_status": "planned",
+    "portable_typing_status": "implemented_unverified",
+    "tests": [
+      "test/compiler/test_select.py",
+      "test/operation_node/test_transformer.py"
+    ],
+    "difference": "Reference comparisons currently cover equality and ordering operators."
   }
 ]

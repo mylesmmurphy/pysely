@@ -52,6 +52,11 @@ class AndNode:
 
 
 @dataclass(frozen=True, slots=True)
+class OrNode:
+    expressions: tuple[OperationNode, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class SelectAllNode:
     table: tuple[IdentifierNode, ...] = ()
 
@@ -95,6 +100,7 @@ OperationNode: TypeAlias = (
     | BinaryOperationNode
     | IsNullNode
     | AndNode
+    | OrNode
     | SelectAllNode
     | SelectQueryNode
     | InsertQueryNode

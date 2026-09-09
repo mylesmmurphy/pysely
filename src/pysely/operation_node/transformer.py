@@ -13,6 +13,7 @@ from .nodes import (
     InsertQueryNode,
     IsNullNode,
     OperationNode,
+    OrNode,
     ReferenceNode,
     SelectAllNode,
     SelectQueryNode,
@@ -71,6 +72,12 @@ class OperationNodeTransformer:
         return replace(node, expression=self.transform(node.expression))
 
     def transform_AndNode(self, node: AndNode) -> OperationNode:
+        return replace(
+            node,
+            expressions=tuple(self.transform(item) for item in node.expressions),
+        )
+
+    def transform_OrNode(self, node: OrNode) -> OperationNode:
         return replace(
             node,
             expressions=tuple(self.transform(item) for item in node.expressions),

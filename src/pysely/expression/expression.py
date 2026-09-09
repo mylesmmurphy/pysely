@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, Literal, Protocol, TypeAlias, TypeVar
 
 from pysely.operation_node import (
     AliasNode,
+    AndNode,
     BinaryOperationNode,
     IdentifierNode,
     IsNullNode,
     OperationNode,
+    OrNode,
     ValueNode,
 )
 
 T = TypeVar("T")
+ComparisonOperator: TypeAlias = Literal["=", "!=", "<>", "<", "<=", ">", ">="]
 
 
 class OperationExpression(Protocol):
@@ -52,3 +55,23 @@ class Expression(Generic[T]):
 @dataclass(frozen=True, slots=True)
 class AliasedExpression(Expression[T]):
     pass
+
+
+def and_(*expressions: Expression[bool]) -> Expression[bool]:
+    if not expressions:
+        raise ValueError("and_() requires at least one expression")
+    return Expression(AndNode(tuple(expression.node for expression in expressions)))
+
+
+def or_(*expressions: Expression[bool]) -> Expression[bool]:
+    if not expressions:
+        raise ValueError("or_() requires at least one expression")
+    return Expression(OrNode(tuple(expression.node for expression in expressions)))
+
+
+def compare_references(
+    left: OperationExpression,
+    operator: ComparisonOperator,
+    right: OperationExpression,
+) -> Expression[bool]:
+    return Expression(BinaryOperationNode(left.node, operator, right.node))
