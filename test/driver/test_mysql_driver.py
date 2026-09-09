@@ -95,17 +95,37 @@ async def test_mysql_pool_execution_and_metadata() -> None:
     assert updated.affected_rows == 2
     assert pool.acquired == 3
     assert pool.released == 3
-    assert not pool.closed
+    assert pool.closed
 
 
-async def test_owned_mysql_pool_closes_and_waits() -> None:
+async def test_mysql_destroy_closes_and_waits() -> None:
     pool = FakePool()
-    db = Pysely[object](dialect=MysqlDialect(pool=pool, owns_pool=True))
+    db = Pysely[object](dialect=MysqlDialect(pool=pool))
 
     await db.destroy()
 
     assert pool.closed
     assert pool.waited_closed
+
+
+async def test_mysql_pool_factory_is_lazy_and_called_once() -> None:
+    pool = FakePool()
+    calls = 0
+
+    async def create_pool() -> FakePool:
+        nonlocal calls
+        calls += 1
+        return pool
+
+    db = Pysely[object](dialect=MysqlDialect(pool=create_pool))
+    assert calls == 0
+
+    await db.select_from(users).select(users.c.id).execute()
+    await db.select_from(users).select(users.c.id).execute()
+    await db.destroy()
+
+    assert calls == 1
+    assert pool.closed
 
 
 async def test_mysql_transaction_pins_connection() -> None:

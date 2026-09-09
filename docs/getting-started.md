@@ -61,10 +61,13 @@ users = Table[UserRow, UserInsert, UserUpdate, UsersColumns](
 ## Connect and query
 
 ```python
+import aiosqlite
+
 from pysely import Pysely, SqliteDialect
 
 
-async with Pysely[object](dialect=SqliteDialect("app.db")) as db:
+database = await aiosqlite.connect("app.db", isolation_level=None)
+async with Pysely[object](dialect=SqliteDialect(database=database)) as db:
     rows = await db.select_from(users).select(users.c.id, users.c.email).execute()
 ```
 

@@ -23,8 +23,8 @@ Current stage: 2 - Execution
 - PostgreSQL/SQLite returning, MSSQL output, and unsupported-feature validation.
 - Live SQLite writes with commit and rollback behavior.
 - Ordered query and result plugin execution.
-- Asyncpg and asyncmy pool adapters with lazy optional imports.
-- Owned and borrowed PostgreSQL/MySQL pool lifecycles and transaction pinning.
+- Structural pool/database adapters with lazy async resource factories.
+- User-provided PostgreSQL/MySQL pool lifecycles and transaction pinning.
 - Live PostgreSQL 16.4 and MySQL 8.4 read, write, and rollback verification in CI.
 - Single-connection scopes and rollback after transaction body or commit failure.
 - Parenthesized boolean groups and basic column-reference comparisons.

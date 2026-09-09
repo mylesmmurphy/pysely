@@ -6,12 +6,12 @@ from pysely import (
     DeleteResult,
     InsertQueryBuilder,
     InsertResult,
-    PostgresDialect,
     Pysely,
     Table,
     UpdateQueryBuilder,
     UpdateResult,
 )
+from test.fixtures.dialects import postgres_dialect
 from test.fixtures.generated import (
     UserInsert,
     UserRow,
@@ -26,7 +26,7 @@ assert_type(
     Table[UserRow, UserInsert, UserUpdate, UsersColumns],
 )
 
-db = Pysely[object](dialect=PostgresDialect())
+db = Pysely[object](dialect=postgres_dialect())
 query = db.select_from(users).select(users.c.id, users.c.email)
 assert_type(query.compile().parameters, tuple[object, ...])
 

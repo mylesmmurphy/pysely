@@ -2,16 +2,15 @@ import pytest
 
 from pysely import (
     MssqlDialect,
-    MysqlDialect,
-    PostgresDialect,
     Pysely,
     UnsupportedFeatureError,
 )
+from test.fixtures.dialects import mysql_dialect, postgres_dialect
 from test.fixtures.generated import users
 
 
 def test_postgres_insert_returning():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     compiled = (
         db.insert_into(users)
@@ -42,7 +41,7 @@ def test_mssql_insert_output():
 
 
 def test_mysql_rejects_returning_before_execution():
-    db = Pysely[object](dialect=MysqlDialect())
+    db = Pysely[object](dialect=mysql_dialect())
     query = (
         db.insert_into(users).values({"email": "ada@example.com"}).returning(users.c.id)
     )
@@ -52,7 +51,7 @@ def test_mysql_rejects_returning_before_execution():
 
 
 def test_update_and_delete_compile_with_ordered_parameters():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     update = (
         db.update_table(users)
@@ -81,7 +80,7 @@ def test_update_and_delete_compile_with_ordered_parameters():
 
 
 def test_bulk_insert_reorders_values_to_the_first_row():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     compiled = (
         db.insert_into(users)

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from pysely import Pysely, QueryPlugin, SqliteDialect
+from pysely import Pysely, QueryPlugin
 from pysely.driver import QueryResult
 from pysely.operation_node import RootOperationNode
-from test.runtime.test_sqlite_execution import create_database, users
+from test.runtime.test_sqlite_execution import create_database, sqlite_dialect, users
 
 
 class RecordingPlugin(QueryPlugin):
@@ -38,7 +38,7 @@ async def test_plugins_transform_queries_and_results_in_registration_order(
         RecordingPlugin("second", events),
     )
 
-    async with Pysely[object](dialect=SqliteDialect(database), plugins=plugins) as db:
+    async with Pysely[object](dialect=sqlite_dialect(database), plugins=plugins) as db:
         rows = await db.select_from(users).select(users.c.id).execute()
 
     assert events == ["query:first", "query:second", "result:first", "result:second"]

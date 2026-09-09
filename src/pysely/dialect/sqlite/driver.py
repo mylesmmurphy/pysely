@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
-from importlib import import_module
-from typing import Protocol, cast
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Protocol
 
 from pysely.driver import DatabaseConnection, QueryResult
 from pysely.errors import ClosedClientError, InvalidQueryError, PyselyError
@@ -11,19 +10,27 @@ from pysely.query_compiler import CompiledQuery
 
 
 class _Cursor(Protocol):
-    description: tuple[tuple[object, ...], ...] | None
-    rowcount: int
-    lastrowid: int | None
+    @property
+    def description(self) -> tuple[tuple[object, ...], ...] | None: ...
 
-    async def fetchall(self) -> list[tuple[object, ...]]: ...
+    @property
+    def rowcount(self) -> int: ...
+
+    @property
+    def lastrowid(self) -> int | None: ...
+
+    def fetchall(self) -> Awaitable[Iterable[Iterable[object]]]: ...
 
     async def close(self) -> None: ...
 
 
-class _Connection(Protocol):
-    async def execute(
+class SqliteDatabaseLike(Protocol):
+    @property
+    def isolation_level(self) -> str | None: ...
+
+    def execute(
         self, sql: str, parameters: tuple[object, ...] = ()
-    ) -> _Cursor: ...
+    ) -> Awaitable[_Cursor]: ...
 
     async def commit(self) -> None: ...
 
@@ -32,14 +39,14 @@ class _Connection(Protocol):
     async def close(self) -> None: ...
 
 
-class _AioSqliteModule(Protocol):
-    def connect(
-        self, database: str, *, isolation_level: None
-    ) -> Awaitable[_Connection]: ...
+SqliteDatabaseFactory = Callable[[], Awaitable[SqliteDatabaseLike]]
+SqliteDatabaseProvider = SqliteDatabaseLike | SqliteDatabaseFactory
 
 
 class SqliteConnection(DatabaseConnection):
-    def __init__(self, connection: _Connection) -> None:
+    def __init__(self, connection: SqliteDatabaseLike) -> None:
+        if connection.isolation_level is not None:
+            raise PyselyError("SQLite databases passed to Pysely must use autocommit")
         self._connection = connection
 
     async def execute_query(
@@ -78,8 +85,9 @@ class SqliteConnection(DatabaseConnection):
 
 
 class SqliteDriver:
-    def __init__(self, database: str) -> None:
-        self._database = database
+    def __init__(self, database: SqliteDatabaseProvider) -> None:
+        self._database_factory = database if callable(database) else None
+        self._database = None if callable(database) else database
         self._connection: SqliteConnection | None = None
         self._destroyed = False
         self._init_lock = asyncio.Lock()
@@ -97,14 +105,11 @@ class SqliteDriver:
         async with self._init_lock:
             if self._connection:
                 return
-            try:
-                module = cast(_AioSqliteModule, import_module("aiosqlite"))
-            except ModuleNotFoundError as error:
-                raise PyselyError(
-                    "SQLite execution requires the 'pysely[sqlite]' extra"
-                ) from error
-            connection = await module.connect(self._database, isolation_level=None)
-            self._connection = SqliteConnection(connection)
+            if self._database is None:
+                if self._database_factory is None:
+                    raise RuntimeError("SQLite driver has no database factory")
+                self._database = await self._database_factory()
+            self._connection = SqliteConnection(self._database)
 
     async def acquire_connection(self) -> DatabaseConnection:
         await self.init()
@@ -122,7 +127,7 @@ class SqliteDriver:
     async def destroy(self) -> None:
         async with self._init_lock, self._connection_lock:
             self._destroyed = True
-            if self._connection is None:
-                return
-            await self._connection.close()
+            if self._database:
+                await self._database.close()
+            self._database = None
             self._connection = None

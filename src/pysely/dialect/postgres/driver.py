@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Mapping
-from importlib import import_module
-from typing import Protocol, cast
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Protocol
 
 from pysely.driver import DatabaseConnection, QueryResult
-from pysely.errors import ClosedClientError, PyselyError
-from pysely.operation_node import (
-    SelectQueryNode,
-)
+from pysely.errors import ClosedClientError
+from pysely.operation_node import SelectQueryNode
 from pysely.query_compiler import CompiledQuery
 
 
@@ -29,8 +26,8 @@ class PostgresPoolLike(Protocol):
     async def close(self) -> None: ...
 
 
-class _AsyncpgModule(Protocol):
-    def create_pool(self, dsn: str) -> Awaitable[PostgresPoolLike]: ...
+PostgresPoolFactory = Callable[[], Awaitable[PostgresPoolLike]]
+PostgresPoolProvider = PostgresPoolLike | PostgresPoolFactory
 
 
 class PostgresConnection(DatabaseConnection):
@@ -62,20 +59,9 @@ class PostgresConnection(DatabaseConnection):
 
 
 class PostgresDriver:
-    def __init__(
-        self,
-        *,
-        pool: PostgresPoolLike | None = None,
-        dsn: str | None = None,
-        owns_pool: bool | None = None,
-    ) -> None:
-        if pool is None and dsn is None:
-            raise ValueError("PostgreSQL requires a pool or DSN")
-        if pool is not None and dsn is not None:
-            raise ValueError("PostgreSQL accepts either a pool or DSN, not both")
-        self._pool = pool
-        self._dsn = dsn
-        self._owns_pool = (pool is None) if owns_pool is None else owns_pool
+    def __init__(self, pool: PostgresPoolProvider) -> None:
+        self._pool_factory = pool if callable(pool) else None
+        self._pool = None if callable(pool) else pool
         self._init_lock = asyncio.Lock()
         self._destroyed = False
 
@@ -91,15 +77,9 @@ class PostgresDriver:
         async with self._init_lock:
             if self._pool:
                 return
-            try:
-                module = cast(_AsyncpgModule, import_module("asyncpg"))
-            except ModuleNotFoundError as error:
-                raise PyselyError(
-                    "PostgreSQL execution requires the 'pysely[postgres]' extra"
-                ) from error
-            if self._dsn is None:
-                raise RuntimeError("PostgreSQL driver has no DSN")
-            self._pool = await module.create_pool(self._dsn)
+            if self._pool_factory is None:
+                raise RuntimeError("PostgreSQL driver has no pool factory")
+            self._pool = await self._pool_factory()
 
     async def acquire_connection(self) -> DatabaseConnection:
         await self.init()
@@ -117,7 +97,7 @@ class PostgresDriver:
             if self._destroyed:
                 return
             self._destroyed = True
-            if self._pool and self._owns_pool:
+            if self._pool:
                 await self._pool.close()
             self._pool = None
 

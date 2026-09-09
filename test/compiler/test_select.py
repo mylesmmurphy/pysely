@@ -2,23 +2,21 @@ import pytest
 
 from pysely import (
     MssqlDialect,
-    MysqlDialect,
     PGliteDialect,
-    PostgresDialect,
     Pysely,
-    SqliteDialect,
     and_,
     or_,
 )
+from test.fixtures.dialects import mysql_dialect, postgres_dialect, sqlite_dialect
 from test.fixtures.generated import users
 
 
 @pytest.mark.parametrize(
     ("dialect", "placeholder", "quote"),
     [
-        (PostgresDialect(), "$1", '"'),
-        (MysqlDialect(), "%s", "`"),
-        (SqliteDialect(), "?", '"'),
+        (postgres_dialect(), "$1", '"'),
+        (mysql_dialect(), "%s", "`"),
+        (sqlite_dialect(), "?", '"'),
         (MssqlDialect(), "?", "["),
         (PGliteDialect(), "$1", '"'),
     ],
@@ -50,7 +48,7 @@ def test_select_with_bound_predicate(dialect, placeholder, quote):
 
 
 def test_builder_branches_do_not_mutate_each_other():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
     base = db.select_from(users).select(users.c.id)
 
     first = base.where(users.c.email.eq("first@example.com"))
@@ -62,7 +60,7 @@ def test_builder_branches_do_not_mutate_each_other():
 
 
 def test_none_comparison_uses_is_null():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     compiled = (
         db.select_from(users)
@@ -82,7 +80,7 @@ def test_expression_rejects_python_truth_testing():
 
 def test_alias_rebinds_columns_without_mutating_table():
     user_alias = users.as_("u")
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     compiled = db.select_from(user_alias).select(user_alias.c.id).compile()
 
@@ -91,7 +89,7 @@ def test_alias_rebinds_columns_without_mutating_table():
 
 
 def test_boolean_groups_preserve_parentheses_and_binding_order():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     compiled = (
         db.select_from(users)
@@ -117,7 +115,7 @@ def test_boolean_groups_preserve_parentheses_and_binding_order():
 
 
 def test_where_ref_compares_columns_without_binding_values():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
 
     compiled = (
         db.select_from(users)

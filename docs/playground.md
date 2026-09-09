@@ -29,10 +29,15 @@ users = Table(
     columns_factory=UsersColumns,
 )
 
+
+async def unavailable_database():
+    raise RuntimeError("The playground only compiles queries")
+
+
 dialects = {
-    "postgres": PostgresDialect(),
-    "mysql": MysqlDialect(),
-    "sqlite": SqliteDialect(),
+    "postgres": PostgresDialect(pool=unavailable_database),
+    "mysql": MysqlDialect(pool=unavailable_database),
+    "sqlite": SqliteDialect(database=unavailable_database),
 }
 db = Pysely[object](dialect=dialects[playground_dialect])
 

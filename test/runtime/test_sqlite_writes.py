@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from pysely import DeleteResult, InsertResult, Pysely, SqliteDialect, UpdateResult
-from test.runtime.test_sqlite_execution import create_database, users
+from pysely import DeleteResult, InsertResult, Pysely, UpdateResult
+from test.runtime.test_sqlite_execution import create_database, sqlite_dialect, users
 
 
 async def test_insert_update_delete_with_returning(tmp_path) -> None:
     database = str(tmp_path / "pysely.db")
     await create_database(database)
 
-    async with Pysely[object](dialect=SqliteDialect(database)) as db:
+    async with Pysely[object](dialect=sqlite_dialect(database)) as db:
         inserted = await (
             db.insert_into(users)
             .values({"email": "linus@example.com"})
@@ -40,7 +40,7 @@ async def test_non_returning_write_metadata(tmp_path) -> None:
     database = str(tmp_path / "pysely.db")
     await create_database(database)
 
-    async with Pysely[object](dialect=SqliteDialect(database)) as db:
+    async with Pysely[object](dialect=sqlite_dialect(database)) as db:
         inserted = (
             await db.insert_into(users).values({"email": "linus@example.com"}).execute()
         )
@@ -62,7 +62,7 @@ async def test_non_returning_write_metadata(tmp_path) -> None:
 async def test_transaction_commits_and_rolls_back_writes(tmp_path) -> None:
     database = str(tmp_path / "pysely.db")
     await create_database(database)
-    db = Pysely[object](dialect=SqliteDialect(database))
+    db = Pysely[object](dialect=sqlite_dialect(database))
 
     async with db.transaction() as tx:
         await tx.insert_into(users).values({"email": "commit@example.com"}).execute()

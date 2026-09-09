@@ -12,7 +12,7 @@ binding profiles, and the generated fixture passes mypy and Pyright.
 ## Stage 2: Execution
 
 - Driver and connection protocols, plugin pipeline, result types, and SQLite driver.
-- Async execution, connection ownership, transactions, savepoints, and cleanup.
+- Async execution, resource providers, transactions, savepoints, and cleanup.
 - PostgreSQL and MySQL adapters with live CI wiring.
 
 Exit: parameterized queries and transaction failure paths pass against PostgreSQL,

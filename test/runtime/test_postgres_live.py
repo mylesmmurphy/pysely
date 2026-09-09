@@ -34,7 +34,7 @@ async def test_postgres_live_read_write_and_rollback(
             "email text not null, nickname text)"
         )
 
-    db = Pysely[object](dialect=PostgresDialect(pool=pool, owns_pool=True))
+    db = Pysely[object](dialect=PostgresDialect(pool=pool))
     inserted = await (
         db.insert_into(users)
         .values({"email": "ada@example.com"})

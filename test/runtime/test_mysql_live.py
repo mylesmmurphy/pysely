@@ -45,7 +45,7 @@ async def test_mysql_live_read_write_and_rollback(pytestconfig: pytest.Config) -
     finally:
         pool.release(connection)
 
-    db = Pysely[object](dialect=MysqlDialect(pool=pool, owns_pool=True))
+    db = Pysely[object](dialect=MysqlDialect(pool=pool))
     inserted = (
         await db.insert_into(users).values({"email": "ada@example.com"}).execute()
     )

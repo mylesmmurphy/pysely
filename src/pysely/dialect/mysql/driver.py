@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
-from importlib import import_module
-from typing import Protocol, cast
+from collections.abc import Awaitable, Callable
+from typing import Protocol
 
 from pysely.driver import DatabaseConnection, QueryResult
 from pysely.errors import ClosedClientError, InvalidQueryError, PyselyError
@@ -44,10 +43,8 @@ class MysqlPoolLike(Protocol):
     async def wait_closed(self) -> None: ...
 
 
-class _AsyncmyModule(Protocol):
-    def create_pool(
-        self, *, host: str, user: str, password: str, db: str, autocommit: bool
-    ) -> Awaitable[MysqlPoolLike]: ...
+MysqlPoolFactory = Callable[[], Awaitable[MysqlPoolLike]]
+MysqlPoolProvider = MysqlPoolLike | MysqlPoolFactory
 
 
 class MysqlConnection(DatabaseConnection):
@@ -94,30 +91,9 @@ class MysqlConnection(DatabaseConnection):
 
 
 class MysqlDriver:
-    def __init__(
-        self,
-        *,
-        pool: MysqlPoolLike | None = None,
-        host: str | None = None,
-        user: str | None = None,
-        password: str = "",
-        database: str | None = None,
-        owns_pool: bool | None = None,
-    ) -> None:
-        if pool is None and (host is None or user is None or database is None):
-            raise ValueError("MySQL requires a pool or host, user, and database")
-        if pool is not None and any(
-            value is not None for value in (host, user, database)
-        ):
-            raise ValueError(
-                "MySQL accepts either a pool or connection settings, not both"
-            )
-        self._pool = pool
-        self._host = host
-        self._user = user
-        self._password = password
-        self._database = database
-        self._owns_pool = (pool is None) if owns_pool is None else owns_pool
+    def __init__(self, pool: MysqlPoolProvider) -> None:
+        self._pool_factory = pool if callable(pool) else None
+        self._pool = None if callable(pool) else pool
         self._init_lock = asyncio.Lock()
         self._destroyed = False
 
@@ -133,21 +109,9 @@ class MysqlDriver:
         async with self._init_lock:
             if self._pool:
                 return
-            try:
-                module = cast(_AsyncmyModule, import_module("asyncmy"))
-            except ModuleNotFoundError as error:
-                raise PyselyError(
-                    "MySQL execution requires the 'pysely[mysql]' extra"
-                ) from error
-            if self._host is None or self._user is None or self._database is None:
-                raise RuntimeError("MySQL driver has incomplete connection settings")
-            self._pool = await module.create_pool(
-                host=self._host,
-                user=self._user,
-                password=self._password,
-                db=self._database,
-                autocommit=True,
-            )
+            if self._pool_factory is None:
+                raise RuntimeError("MySQL driver has no pool factory")
+            self._pool = await self._pool_factory()
 
     async def acquire_connection(self) -> DatabaseConnection:
         await self.init()
@@ -170,7 +134,7 @@ class MysqlDriver:
             if self._destroyed:
                 return
             self._destroyed = True
-            if self._pool and self._owns_pool:
+            if self._pool:
                 self._pool.close()
                 await self._pool.wait_closed()
             self._pool = None

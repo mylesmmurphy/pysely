@@ -1,7 +1,8 @@
 from dataclasses import replace
 
-from pysely import PostgresDialect, Pysely, or_
+from pysely import Pysely, or_
 from pysely.operation_node import IdentifierNode, OperationNodeTransformer
+from test.fixtures.dialects import postgres_dialect
 from test.fixtures.generated import users
 
 
@@ -13,7 +14,7 @@ class RenameEmail(OperationNodeTransformer):
 
 
 def test_transformer_walks_the_complete_select_tree():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
     query = (
         db.select_from(users)
         .select(users.c.email)
@@ -27,7 +28,7 @@ def test_transformer_walks_the_complete_select_tree():
 
 
 def test_base_transformer_covers_write_query_trees():
-    db = Pysely[object](dialect=PostgresDialect())
+    db = Pysely[object](dialect=postgres_dialect())
     queries = (
         db.insert_into(users).values({"email": "a@example.com"}),
         db.update_table(users).set({"nickname": "A"}).where(users.c.id.eq(1)),

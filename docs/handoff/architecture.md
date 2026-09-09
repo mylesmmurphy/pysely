@@ -194,7 +194,7 @@ Capabilities must distinguish engine version and driver behavior: returning/outp
 
 Use an async-first execution API, matching Kysely's asynchronous contract. Building and compiling are synchronous. A synchronous public facade is a separately documented future Python enhancement, not a hidden `asyncio.run()` wrapper. Never block the event loop with an unadapted driver.
 
-Driver/connection protocols cover init, acquisition, release/discard, execute, stream, begin/commit/rollback, savepoints, and shutdown. Distinguish owned pools from borrowed pools: client destruction must not close externally owned resources unless explicitly configured. Concurrent initialization and repeated shutdown need deterministic behavior.
+Driver/connection protocols cover init, acquisition, release/discard, execute, stream, begin/commit/rollback, savepoints, and shutdown. Dialects receive database resources or lazy resource factories instead of connection settings, and client destruction closes initialized resources. Concurrent initialization and repeated shutdown need deterministic behavior.
 
 Use dictionary rows by default. Low-level `QueryResult[Row]` holds rows plus optional affected rows, changed rows, and insert ID. Missing metadata is `None`, not invented zero. High-level read and returning builders produce `list[Row]`; non-returning writes mirror Kysely's operation-result semantics with Python result dataclasses. Verify first/first-or-throw and row-count semantics against the baseline.
 
@@ -361,7 +361,7 @@ The examples use `.c` consistently. Preserve Kysely's string-reference style as 
 from app.db.generated import users
 from pysely import Pysely, PostgresDialect
 
-async with Pysely(dialect=PostgresDialect(pool=pool, owns_pool=False)) as db:
+async with Pysely(dialect=PostgresDialect(pool=pool)) as db:
     rows = await (
         db.select_from(users)
         .select(users.c.id, users.c.email)
@@ -692,4 +692,3 @@ Each runtime file below should map to `test/runtime/test_<snake_case_topic>.py`,
 - `with.test-d.ts`
 
 JavaScript-specific files such as async disposal, stack traces, compiler-version compatibility, and module exports need Python-equivalent semantics rather than superficial syntax translation. File-level inventory is the starting point; the case ledger remains the completion authority.
-
