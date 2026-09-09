@@ -13,6 +13,7 @@ build/
 dist/
 htmlcov/
 site/
+docs/wheels/
 .env
 .envrc
 .pypirc
