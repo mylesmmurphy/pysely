@@ -8,13 +8,16 @@ from .nodes import (
     AliasNode,
     AndNode,
     BinaryOperationNode,
+    DeleteQueryNode,
     IdentifierNode,
+    InsertQueryNode,
     IsNullNode,
     OperationNode,
     ReferenceNode,
     SelectAllNode,
     SelectQueryNode,
     TableNode,
+    UpdateQueryNode,
     ValueNode,
 )
 
@@ -85,6 +88,37 @@ class OperationNodeTransformer:
             from_=tuple(self._table(table) for table in node.from_),
             selections=tuple(self.transform(item) for item in node.selections),
             where=self.transform(node.where) if node.where else None,
+        )
+
+    def transform_InsertQueryNode(self, node: InsertQueryNode) -> OperationNode:
+        return replace(
+            node,
+            into=self._table(node.into),
+            columns=tuple(self._identifier(column) for column in node.columns),
+            values=tuple(
+                tuple(self.transform(value) for value in row) for row in node.values
+            ),
+            returning=tuple(self.transform(item) for item in node.returning),
+        )
+
+    def transform_UpdateQueryNode(self, node: UpdateQueryNode) -> OperationNode:
+        return replace(
+            node,
+            table=self._table(node.table),
+            assignments=tuple(
+                (self._identifier(column), self.transform(value))
+                for column, value in node.assignments
+            ),
+            where=self.transform(node.where) if node.where else None,
+            returning=tuple(self.transform(item) for item in node.returning),
+        )
+
+    def transform_DeleteQueryNode(self, node: DeleteQueryNode) -> OperationNode:
+        return replace(
+            node,
+            from_=self._table(node.from_),
+            where=self.transform(node.where) if node.where else None,
+            returning=tuple(self.transform(item) for item in node.returning),
         )
 
     def _identifier(self, node: IdentifierNode) -> IdentifierNode:

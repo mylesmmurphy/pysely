@@ -20,3 +20,15 @@ def test_transformer_walks_the_complete_select_tree():
 
     assert transformed != query._node
     assert query.compile().sql.count('"email"') == 2
+
+
+def test_base_transformer_covers_write_query_trees():
+    db = Pysely[object](dialect=PostgresDialect())
+    queries = (
+        db.insert_into(users).values({"email": "a@example.com"}),
+        db.update_table(users).set({"nickname": "A"}).where(users.c.id.eq(1)),
+        db.delete_from(users).where(users.c.id.eq(1)),
+    )
+    transformer = OperationNodeTransformer()
+
+    assert all(transformer.transform(query._node) == query._node for query in queries)

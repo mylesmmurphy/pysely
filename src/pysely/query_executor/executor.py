@@ -5,14 +5,14 @@ from typing import Protocol
 
 from pysely.driver import DatabaseConnection, Driver, QueryResult
 from pysely.errors import PyselyError
-from pysely.operation_node import OperationNode, SelectQueryNode
+from pysely.operation_node import RootOperationNode
 from pysely.query_compiler import CompiledQuery, QueryCompiler
 
 
 class QueryPlugin(Protocol):
     def transform_query(
-        self, query: SelectQueryNode, query_id: str
-    ) -> OperationNode: ...
+        self, query: RootOperationNode, query_id: str
+    ) -> RootOperationNode: ...
 
     def transform_result(
         self, result: QueryResult[dict[str, object]], query_id: str
@@ -27,18 +27,18 @@ class QueryExecutor:
     connection: DatabaseConnection | None = None
 
     def compile_query(
-        self, query: SelectQueryNode, query_id: str
+        self, query: RootOperationNode, query_id: str
     ) -> CompiledQuery[dict[str, object]]:
         transformed = query
         for plugin in self.plugins:
             candidate = plugin.transform_query(transformed, query_id)
-            if not isinstance(candidate, SelectQueryNode):
+            if type(candidate) is not type(transformed):
                 raise TypeError("Query plugins must preserve the root operation type")
             transformed = candidate
         return self.compiler.compile(transformed, query_id)
 
     async def execute_query(
-        self, query: SelectQueryNode, query_id: str
+        self, query: RootOperationNode, query_id: str
     ) -> QueryResult[dict[str, object]]:
         compiled = self.compile_query(query, query_id)
         driver = self.driver

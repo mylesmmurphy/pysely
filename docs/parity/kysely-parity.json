@@ -49,5 +49,47 @@
     "portable_typing_status": "verified",
     "tests": ["test/runtime/test_sqlite_execution.py"],
     "difference": null
+  },
+  {
+    "id": "write.insert.update.delete.sqlite",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-builder/",
+    "upstream_tests": [
+      "test/node/src/insert.test.ts",
+      "test/node/src/update.test.ts",
+      "test/node/src/delete.test.ts"
+    ],
+    "pysely_api": "Pysely.insert_into/update_table/delete_from",
+    "dialect_support": {
+      "sqlite": true
+    },
+    "runtime_status": "verified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": [
+      "test/compiler/test_write.py",
+      "test/runtime/test_sqlite_writes.py",
+      "test/typings/portable.py"
+    ],
+    "difference": null
+  },
+  {
+    "id": "plugin.composition.order",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-executor/default-query-executor.ts",
+    "upstream_tests": ["test/node/src/plugin-composition.test.ts"],
+    "pysely_api": "QueryPlugin",
+    "dialect_support": {
+      "postgres": true,
+      "mysql": true,
+      "sqlite": true,
+      "mssql": true,
+      "pglite": true
+    },
+    "runtime_status": "verified",
+    "mypy_status": "planned",
+    "portable_typing_status": "verified",
+    "tests": ["test/runtime/test_plugins.py"],
+    "difference": null
   }
 ]

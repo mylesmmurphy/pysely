@@ -63,6 +63,29 @@ class SelectQueryNode:
     where: OperationNode | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class InsertQueryNode:
+    into: TableNode
+    columns: tuple[IdentifierNode, ...] = ()
+    values: tuple[tuple[OperationNode, ...], ...] = ()
+    returning: tuple[OperationNode, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateQueryNode:
+    table: TableNode
+    assignments: tuple[tuple[IdentifierNode, OperationNode], ...] = ()
+    where: OperationNode | None = None
+    returning: tuple[OperationNode, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DeleteQueryNode:
+    from_: TableNode
+    where: OperationNode | None = None
+    returning: tuple[OperationNode, ...] = ()
+
+
 OperationNode: TypeAlias = (
     IdentifierNode
     | TableNode
@@ -74,4 +97,11 @@ OperationNode: TypeAlias = (
     | AndNode
     | SelectAllNode
     | SelectQueryNode
+    | InsertQueryNode
+    | UpdateQueryNode
+    | DeleteQueryNode
+)
+
+RootOperationNode: TypeAlias = (
+    SelectQueryNode | InsertQueryNode | UpdateQueryNode | DeleteQueryNode
 )

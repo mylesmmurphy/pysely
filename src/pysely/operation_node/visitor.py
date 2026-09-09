@@ -4,13 +4,16 @@ from .nodes import (
     AliasNode,
     AndNode,
     BinaryOperationNode,
+    DeleteQueryNode,
     IdentifierNode,
+    InsertQueryNode,
     IsNullNode,
     OperationNode,
     ReferenceNode,
     SelectAllNode,
     SelectQueryNode,
     TableNode,
+    UpdateQueryNode,
     ValueNode,
 )
 
@@ -66,3 +69,30 @@ class OperationNodeVisitor:
             self.visit(selection)
         if node.where:
             self.visit(node.where)
+
+    def visit_InsertQueryNode(self, node: InsertQueryNode) -> None:
+        self.visit(node.into)
+        for column in node.columns:
+            self.visit(column)
+        for row in node.values:
+            for value in row:
+                self.visit(value)
+        for selection in node.returning:
+            self.visit(selection)
+
+    def visit_UpdateQueryNode(self, node: UpdateQueryNode) -> None:
+        self.visit(node.table)
+        for column, value in node.assignments:
+            self.visit(column)
+            self.visit(value)
+        if node.where:
+            self.visit(node.where)
+        for selection in node.returning:
+            self.visit(selection)
+
+    def visit_DeleteQueryNode(self, node: DeleteQueryNode) -> None:
+        self.visit(node.from_)
+        if node.where:
+            self.visit(node.where)
+        for selection in node.returning:
+            self.visit(selection)

@@ -1,6 +1,17 @@
 from typing import Literal, assert_type
 
-from pysely import Column, PostgresDialect, Pysely, Table
+from pysely import (
+    Column,
+    DeleteQueryBuilder,
+    DeleteResult,
+    InsertQueryBuilder,
+    InsertResult,
+    PostgresDialect,
+    Pysely,
+    Table,
+    UpdateQueryBuilder,
+    UpdateResult,
+)
 from test.fixtures.generated import (
     UserInsert,
     UserRow,
@@ -18,3 +29,16 @@ assert_type(
 db = Pysely[object](dialect=PostgresDialect())
 query = db.select_from(users).select(users.c.id, users.c.email)
 assert_type(query.compile().parameters, tuple[object, ...])
+
+insert = db.insert_into(users).values({"email": "ada@example.com"})
+assert_type(insert, InsertQueryBuilder[UserInsert, InsertResult])
+assert_type(
+    insert.returning(users.c.id),
+    InsertQueryBuilder[UserInsert, list[dict[str, object]]],
+)
+
+update = db.update_table(users).set({"nickname": "Ada"})
+assert_type(update, UpdateQueryBuilder[UserUpdate, UpdateResult])
+
+delete = db.delete_from(users).where(users.c.id.eq(1))
+assert_type(delete, DeleteQueryBuilder[DeleteResult])

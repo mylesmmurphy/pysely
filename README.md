@@ -6,6 +6,7 @@ The project is in active development. The current implementation supports immuta
 typed table metadata, select construction, predicates, aliases, and offline SQL
 compilation for PostgreSQL, MySQL, SQLite, SQL Server, and PGlite binding profiles.
 SQLite also supports async execution and transaction scopes through `aiosqlite`.
+Insert, update, and delete builders support bound values and returning projections.
 
 ```python
 query = (

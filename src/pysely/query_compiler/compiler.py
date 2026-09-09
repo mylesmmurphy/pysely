@@ -3,18 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from pysely.errors import InvalidQueryError
+from pysely.errors import InvalidQueryError, UnsupportedFeatureError
 from pysely.operation_node import (
     AliasNode,
     AndNode,
     BinaryOperationNode,
+    DeleteQueryNode,
     IdentifierNode,
+    InsertQueryNode,
     IsNullNode,
     OperationNode,
     ReferenceNode,
+    RootOperationNode,
     SelectAllNode,
     SelectQueryNode,
     TableNode,
+    UpdateQueryNode,
     ValueNode,
 )
 
@@ -27,6 +31,7 @@ class BindingProfile:
     placeholder: str
     identifier_open: str = '"'
     identifier_close: str = '"'
+    returning_style: str | None = "returning"
 
     def bind(self, position: int) -> str:
         return self.placeholder.format(position=position)
@@ -36,7 +41,7 @@ class BindingProfile:
 class CompiledQuery(Generic[RowT]):
     sql: str
     parameters: tuple[object, ...]
-    query: SelectQueryNode
+    query: RootOperationNode
     query_id: str
     binding_profile: str
 
@@ -47,10 +52,17 @@ class QueryCompiler:
         self._parameters: list[object] = []
 
     def compile(
-        self, node: SelectQueryNode, query_id: str
+        self, node: RootOperationNode, query_id: str
     ) -> CompiledQuery[dict[str, object]]:
         self._parameters = []
-        sql = self._compile_select(node)
+        if isinstance(node, SelectQueryNode):
+            sql = self._compile_select(node)
+        elif isinstance(node, InsertQueryNode):
+            sql = self._compile_insert(node)
+        elif isinstance(node, UpdateQueryNode):
+            sql = self._compile_update(node)
+        else:
+            sql = self._compile_delete(node)
         return CompiledQuery(
             sql=sql,
             parameters=tuple(self._parameters),
@@ -69,6 +81,80 @@ class QueryCompiler:
         if node.where:
             sql += " where " + self._compile(node.where)
         return sql
+
+    def _compile_insert(self, node: InsertQueryNode) -> str:
+        if not node.columns or not node.values:
+            raise InvalidQueryError("insert values are required")
+        if any(len(row) != len(node.columns) for row in node.values):
+            raise InvalidQueryError("insert rows must contain the same columns")
+
+        columns = ", ".join(self._compile(column) for column in node.columns)
+        values = ", ".join(
+            "(" + ", ".join(self._compile(value) for value in row) + ")"
+            for row in node.values
+        )
+        sql = f"insert into {self._compile(node.into)} ({columns})"
+        sql += self._output_clause(node.returning, "inserted")
+        sql += f" values {values}"
+        return sql + self._returning_clause(node.returning)
+
+    def _compile_update(self, node: UpdateQueryNode) -> str:
+        if not node.assignments:
+            raise InvalidQueryError("update assignments are required")
+        assignments = ", ".join(
+            f"{self._compile(column)} = {self._compile(value)}"
+            for column, value in node.assignments
+        )
+        sql = f"update {self._compile(node.table)} set {assignments}"
+        sql += self._output_clause(node.returning, "inserted")
+        if node.where:
+            sql += " where " + self._compile(node.where)
+        return sql + self._returning_clause(node.returning)
+
+    def _compile_delete(self, node: DeleteQueryNode) -> str:
+        sql = f"delete from {self._compile(node.from_)}"
+        sql += self._output_clause(node.returning, "deleted")
+        if node.where:
+            sql += " where " + self._compile(node.where)
+        return sql + self._returning_clause(node.returning)
+
+    def _returning_clause(self, selections: tuple[OperationNode, ...]) -> str:
+        if not selections:
+            return ""
+        if self.profile.returning_style is None:
+            raise UnsupportedFeatureError(
+                f"{self.profile.name} does not support returning projections"
+            )
+        if self.profile.returning_style == "output":
+            return ""
+        returning = ", ".join(
+            self._compile_returning(selection) for selection in selections
+        )
+        return f" returning {returning}"
+
+    def _output_clause(self, selections: tuple[OperationNode, ...], source: str) -> str:
+        if not selections or self.profile.returning_style != "output":
+            return ""
+        output = ", ".join(
+            self._compile_output(selection, source) for selection in selections
+        )
+        return f" output {output}"
+
+    def _compile_returning(self, node: OperationNode) -> str:
+        if isinstance(node, ReferenceNode):
+            return self._compile(node.column)
+        if isinstance(node, AliasNode):
+            value = self._compile_returning(node.node)
+            return f"{value} as {self._compile(node.alias)}"
+        return self._compile(node)
+
+    def _compile_output(self, node: OperationNode, source: str) -> str:
+        if isinstance(node, ReferenceNode):
+            return f"{self._quote(source)}.{self._compile(node.column)}"
+        if isinstance(node, AliasNode):
+            value = self._compile_output(node.node, source)
+            return f"{value} as {self._compile(node.alias)}"
+        return self._compile(node)
 
     def _compile(self, node: OperationNode) -> str:
         if isinstance(node, IdentifierNode):
@@ -104,7 +190,9 @@ class QueryCompiler:
                 return "*"
             table = ".".join(self._compile(part) for part in node.table)
             return f"{table}.*"
-        return f"({self._compile_select(node)})"
+        if isinstance(node, SelectQueryNode):
+            return f"({self._compile_select(node)})"
+        raise TypeError(f"Unsupported nested operation node: {type(node).__name__}")
 
     def _quote(self, identifier: str) -> str:
         escaped = identifier.replace(

@@ -6,8 +6,21 @@ from typing import Generic, TypeVar
 from pysely.catalog import Table
 from pysely.dialect import Dialect
 from pysely.driver import DatabaseConnection
-from pysely.query_builder import SelectQueryBuilder
-from pysely.query_executor import QueryExecutor
+from pysely.query_builder import (
+    DeleteQueryBuilder,
+    DeleteResult,
+    InsertQueryBuilder,
+    InsertResult,
+    SelectQueryBuilder,
+    UpdateQueryBuilder,
+    UpdateResult,
+)
+from pysely.query_builder.write_query_builder import (
+    create_delete_builder,
+    create_insert_builder,
+    create_update_builder,
+)
+from pysely.query_executor import QueryExecutor, QueryPlugin
 
 DatabaseT = TypeVar("DatabaseT")
 RowT = TypeVar("RowT")
@@ -17,8 +30,15 @@ ColumnsT = TypeVar("ColumnsT")
 
 
 class Pysely(Generic[DatabaseT]):
-    def __init__(self, *, dialect: Dialect) -> None:
-        self._executor = QueryExecutor(dialect.create_query_compiler(), dialect.driver)
+    def __init__(
+        self,
+        *,
+        dialect: Dialect,
+        plugins: tuple[QueryPlugin, ...] = (),
+    ) -> None:
+        self._executor = QueryExecutor(
+            dialect.create_query_compiler(), dialect.driver, plugins
+        )
 
     async def __aenter__(self) -> Pysely[DatabaseT]:
         return self
@@ -36,6 +56,21 @@ class Pysely(Generic[DatabaseT]):
         self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
     ) -> SelectQueryBuilder[dict[str, object]]:
         return SelectQueryBuilder.from_table(table, self._executor)
+
+    def insert_into(
+        self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
+    ) -> InsertQueryBuilder[InsertT, InsertResult]:
+        return create_insert_builder(table, self._executor)
+
+    def update_table(
+        self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
+    ) -> UpdateQueryBuilder[UpdateT, UpdateResult]:
+        return create_update_builder(table, self._executor)
+
+    def delete_from(
+        self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
+    ) -> DeleteQueryBuilder[DeleteResult]:
+        return create_delete_builder(table, self._executor)
 
     def transaction(self) -> TransactionContext[DatabaseT]:
         return TransactionContext(self._executor)

@@ -22,7 +22,8 @@ class PostgresDialect(Dialect):
 
 class MysqlDialect(Dialect):
     def __init__(self, *, driver: Driver | None = None) -> None:
-        super().__init__(BindingProfile("mysql-asyncmy", "%s", "`", "`"), driver)
+        profile = BindingProfile("mysql-asyncmy", "%s", "`", "`", None)
+        super().__init__(profile, driver)
 
 
 class SqliteDialect(Dialect):
@@ -37,7 +38,8 @@ class SqliteDialect(Dialect):
 
 class MssqlDialect(Dialect):
     def __init__(self, *, driver: Driver | None = None) -> None:
-        super().__init__(BindingProfile("mssql-aioodbc", "?", "[", "]"), driver)
+        profile = BindingProfile("mssql-aioodbc", "?", "[", "]", "output")
+        super().__init__(profile, driver)
 
 
 class PGliteDialect(Dialect):
