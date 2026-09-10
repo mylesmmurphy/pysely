@@ -346,7 +346,7 @@
         status.textContent = worker ? "Compiling…" : "Loading Python…";
         error.hidden = true;
         if (!worker) {
-          worker = new Worker(new URL("playground-worker.js", assets), { type: "module" });
+          worker = new Worker(new URL("playground-worker.js?build=2", assets), { type: "module" });
           worker.onmessage = ({ data }) => {
             if (data.id !== id) return;
             busy = false;

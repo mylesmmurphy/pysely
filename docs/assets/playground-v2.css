@@ -1,0 +1,5 @@
+@import url("playground.css?build=2");
+
+body:has(#playground) .md-content__inner { margin-top: .6rem; }
+body:has(#playground) .md-typeset h1 { margin: 0 0 .2rem; font-size: 1.8rem; }
+body:has(#playground) .md-typeset h1 + p { margin: 0 0 .75rem; }

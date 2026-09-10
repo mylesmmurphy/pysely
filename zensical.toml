@@ -15,10 +15,10 @@ nav = [
   { "Dialects" = "dialects.md" },
   { "Project status" = "project-status.md" },
 ]
-extra_css = ["assets/playground.css"]
+extra_css = ["assets/playground-v2.css"]
 extra_javascript = [
   "assets/site.js",
-  "assets/playground.js",
+  "assets/playground-v2.js",
 ]
 
 [project.extra]

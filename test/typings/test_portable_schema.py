@@ -79,6 +79,7 @@ def test_pyright_language_server_completes_generated_schema() -> None:
     process = subprocess.Popen(
         [executable, "--stdio"],
         cwd=ROOT,
+        bufsize=0,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
