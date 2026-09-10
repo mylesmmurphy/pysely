@@ -55,6 +55,9 @@ broader mapping type.
 
 ## Diagnosing a long query
 
+Fluent chaining remains the intended API. The debugging technique below is
+optional, not a requirement or a replacement for the builder pattern.
+
 A failed call can underline the preceding fluent chain because the checker treats
 that chain as the call's receiver. This also happens for missing arguments in
 non-overloaded methods. Invalid columns in ordinary `where` and `select` calls

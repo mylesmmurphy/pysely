@@ -108,3 +108,22 @@ playground input to hide the limitation. Return-annotated helpers are appropriat
 at real application boundaries, not a reason to require verbose query annotations
 everywhere. No checker configuration or public method signature was weakened in
 this follow-up.
+
+## Follow-up: `Self` return annotations
+
+The public typed `where` and `select` methods already return `Self`. The
+`self_normal_method` and `self_overloaded_method` probes in
+`test/typings/diagnostic_recovery.txt` explicitly compare ordinary and overloaded
+methods returning `Self` throughout a fluent chain. With Pyright 1.1.413, the
+ordinary bad argument keeps its precise range and `SelfBuilder` result. The failed
+overload still produces a multiline call error and `Unknown` result. Mypy likewise
+retains `SelfBuilder` for the ordinary method but returns `Any` for the failed
+overload. `Self` does not override failed-overload recovery.
+
+Public joins and typed aliases intentionally return a query with different generic
+arguments: joins add column scope, and aliases add projected key/value types.
+Replacing those return types with `Self` would preserve the old scope and result
+type instead of expressing the operation. Keep `Self` for operations preserving
+the static query type, and explicit generic return types where it changes. Fluent
+chaining remains the intended API; splitting statements is only an optional
+debugging technique.

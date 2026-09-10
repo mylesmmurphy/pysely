@@ -112,3 +112,30 @@ def actual_where(db: Database) -> None:
 
 def actual_join(db: Database) -> None:
     reveal_type(db.select_from("person").inner_join("pett", "owner_id", "person.id").where("first_name", "=", "Jennifer"))
+
+
+class SelfBuilder(Protocol):
+    def value(self, value: int) -> Self: ...
+
+    @overload
+    def step(self, value: int) -> Self: ...
+    @overload
+    def step(self, value: str) -> Self: ...
+
+
+def self_normal_method(builder: SelfBuilder) -> None:
+    result = (
+        builder.value(1)
+        .value("bad")
+        .value(2)
+    )
+    reveal_type(result)
+
+
+def self_overloaded_method(builder: SelfBuilder) -> None:
+    result = (
+        builder.value(1)
+        .step(1.5)
+        .value(2)
+    )
+    reveal_type(result)
