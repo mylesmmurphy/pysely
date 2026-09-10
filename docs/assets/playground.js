@@ -310,7 +310,7 @@
     const error = root.querySelector("#playground-error");
     try {
       const [, schemaResponse, queryResponse] = await Promise.all([
-        loadEditor(), fetch(new URL("examples/schema.py?build=6", assets)), fetch(new URL("examples/query.py?build=6", assets)),
+        loadEditor(), fetch(new URL("examples/schema.py?build=6", assets)), fetch(new URL("examples/query.py?build=7", assets)),
       ]);
       if (!root.isConnected || version !== mountVersion) return;
       if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");

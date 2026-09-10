@@ -30,7 +30,7 @@ hide:
 
 - Run compiles a query in your browser with the selected dialect. No database
   connection is required.
-- `show_results` demonstrates the typed execution result. The playground does not
+- `run_query` demonstrates the typed execution result. The playground does not
   invoke it.
 - Suggestions, type information, and diagnostics come from Pyright in a browser
   worker.

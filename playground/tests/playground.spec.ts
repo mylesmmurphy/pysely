@@ -103,8 +103,9 @@ test("keeps real execution available", async ({ page }) => {
     const monaco = (window as any).monaco;
     return monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).getValue();
   });
-  expect(query).toContain("results = await query.execute()");
-  expect(query).toContain('result["pet_name"]');
+  expect(query).toContain("rows = await query.execute()");
+  expect(query).toContain('rows[0]["first_name"]');
+  expect(query).toContain('rows[0]["pet_name"]');
 });
 
 test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {

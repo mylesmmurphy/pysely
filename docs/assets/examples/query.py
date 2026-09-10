@@ -17,8 +17,8 @@ query = (
 compiled = query.compile()
 
 
-async def show_results() -> None:
-    results = await query.execute()
-    for result in results:
-        pet_name: str = result["pet_name"]
-        print(pet_name)
+async def run_query() -> None:
+    rows = await query.execute()
+    # Result keys are typed and offer autocomplete.
+    rows[0]["first_name"]
+    rows[0]["pet_name"]
