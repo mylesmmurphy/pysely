@@ -2,13 +2,22 @@
   const assets = new URL(".", document.currentScript.src);
   const monacoBase = "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs";
   let loading;
+  let mountVersion = 0;
   let cleanup = () => {};
 
   function loadEditor() {
     loading ??= new Promise((resolve, reject) => {
+      const stylesheet = document.createElement("link");
+      stylesheet.rel = "stylesheet";
+      stylesheet.href = `${monacoBase}/editor/editor.main.css`;
+      const stylesReady = new Promise((stylesResolve, stylesReject) => {
+        stylesheet.onload = stylesResolve;
+        stylesheet.onerror = stylesReject;
+      });
+      document.head.append(stylesheet);
       const script = document.createElement("script");
       script.src = `${monacoBase}/loader.js`;
-      script.onerror = () => reject(new Error("Could not load the code editor. Reload to retry."));
+      script.onerror = () => reject(new Error("Could not load the code editor."));
       script.onload = () => {
         window.MonacoEnvironment = {
           getWorkerUrl: () => URL.createObjectURL(new Blob([
@@ -16,14 +25,18 @@
           ], { type: "text/javascript" })),
         };
         window.require.config({ paths: { vs: monacoBase } });
-        window.require(["vs/editor/editor.main"], resolve, reject);
+        window.require(["vs/editor/editor.main"], () => stylesReady.then(resolve, reject), reject);
       };
       document.head.append(script);
+    }).catch(error => {
+      loading = undefined;
+      throw error;
     });
     return loading;
   }
 
   async function mount() {
+    const version = ++mountVersion;
     cleanup();
     const root = document.querySelector("#playground-workbench");
     if (!root) return;
@@ -33,7 +46,7 @@
       const [, schemaResponse, queryResponse] = await Promise.all([
         loadEditor(), fetch(new URL("examples/schema.py", assets)), fetch(new URL("examples/query.py", assets)),
       ]);
-      if (!root.isConnected) return;
+      if (!root.isConnected || version !== mountVersion) return;
       if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");
       const examples = await Promise.all([schemaResponse.text(), queryResponse.text()]);
       const monaco = window.monaco;
@@ -41,10 +54,11 @@
         padding: { top: 12 }, tabSize: 4, wordWrap: "on", fixedOverflowWidgets: true,
         quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
       const models = [
-        monaco.editor.createModel(examples[0], "python", monaco.Uri.parse("file:///schema.py")),
-        monaco.editor.createModel(examples[1], "python", monaco.Uri.parse("file:///query.py")),
+        monaco.editor.createModel(examples[0], "python", monaco.Uri.parse(`file:///schema-${version}.py`)),
+        monaco.editor.createModel(examples[1], "python", monaco.Uri.parse(`file:///query-${version}.py`)),
         monaco.editor.createModel("-- Loading Python…", "sql"),
       ];
+      for (const name of ["schema", "query", "sql"]) root.querySelector(`#playground-${name}`).textContent = "";
       const editors = ["schema", "query", "sql"].map((name, index) => monaco.editor.create(
         root.querySelector(`#playground-${name}`), { ...options, model: models[index], readOnly: index === 2, ariaLabel: `${name} editor` },
       ));
@@ -164,7 +178,7 @@
       root.querySelector("#playground-reset").onclick = () => { stop(); models[0].setValue(examples[0]); models[1].setValue(examples[1]); run(); };
       editors[1].addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
       cleanup = () => { stop(); observer.disconnect(); completion.dispose(); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
-      run();
+      requestAnimationFrame(() => requestAnimationFrame(run));
     } catch (failure) {
       status.textContent = "Could not load playground";
       error.textContent = String(failure);
