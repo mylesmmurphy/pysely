@@ -10,11 +10,14 @@ const enhancePage = () => {
   }
 
   for (const link of document.querySelectorAll(".md-footer__link")) {
+    link.querySelector(".md-footer__direction")?.setAttribute("aria-hidden", "true");
+    if (link.classList.contains("md-footer__link--next")) {
+      link.classList.add("md-footer__link--primary");
+    }
     if (!new URL(link.href).pathname.endsWith("/playground/")) continue;
-    link.classList.add("md-footer__link--playground");
+    link.classList.add("md-footer__link--playground", "md-footer__link--primary");
     link.setAttribute("aria-label", "Open the interactive playground editor");
-    link.querySelector(".md-footer__direction").textContent = "Interactive editor";
-    link.querySelector(".md-ellipsis").textContent = "Open playground";
+    link.querySelector(".md-ellipsis").textContent = "Open playground editor";
   }
 };
 

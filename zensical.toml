@@ -15,9 +15,9 @@ nav = [
   { "Dialects" = "dialects.md" },
   { "Project status" = "project-status.md" },
 ]
-extra_css = ["assets/site-v1.css", "assets/playground-v5.css"]
+extra_css = ["assets/site-v2.css", "assets/playground-v5.css"]
 extra_javascript = [
-  "assets/site-v1.js",
+  "assets/site-v2.js",
   "assets/playground-v8.js",
 ]
 
