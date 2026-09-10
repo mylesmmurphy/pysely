@@ -337,15 +337,31 @@
       };
       const wheelDisposers = editors.map(editor => {
         const element = editor.getDomNode();
+        let lastWheelAt = 0;
         const onWheel = event => {
           if (!event.deltaY) return;
-          const atTop = editor.getScrollTop() <= 0;
-          const atBottom = editor.getScrollTop() + editor.getLayoutInfo().height >= editor.getScrollHeight() - 1;
+          const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
+          const delta = event.deltaY * scale;
+          const scrollTop = editor.getScrollTop();
+          const maxScrollTop = editor.getScrollHeight() - editor.getLayoutInfo().height;
+          const atTop = scrollTop <= 0;
+          const atBottom = scrollTop >= maxScrollTop - 1;
+          const continuingGesture = event.timeStamp - lastWheelAt < 160;
+          const crossesTop = delta < 0 && !atTop && scrollTop + delta <= 0;
+          const crossesBottom = delta > 0 && !atBottom && scrollTop + delta >= maxScrollTop;
+          lastWheelAt = event.timeStamp;
+
+          if (crossesTop || crossesBottom) {
+            editor.setScrollTop(crossesTop ? 0 : maxScrollTop);
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+          }
+
           if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
-            window.scrollBy(0, event.deltaY * scale);
+            if (!continuingGesture) window.scrollBy(0, delta);
           }
         };
         element.addEventListener("wheel", onWheel, { capture: true, passive: false });

@@ -22,8 +22,8 @@ extra_css = [
   "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/editor/editor.main.css",
 ]
 extra_javascript = [
-  "assets/site-v3.js",
-  "assets/playground-v11.js",
+  "assets/site-v4.js",
+  "assets/playground-v12.js",
 ]
 
 [project.extra]

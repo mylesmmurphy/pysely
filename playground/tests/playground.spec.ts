@@ -80,7 +80,7 @@ query.where("person.status", "!=", "")`);
   ]));
 });
 
-test("scrolls editors and passes wheel scrolling to the page at the boundary", async ({ page }) => {
+test("hands scrolling to the page on the next gesture at the editor boundary", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/playground/");
   await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
@@ -104,13 +104,10 @@ test("scrolls editors and passes wheel scrolling to the page at the boundary", a
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   await page.mouse.wheel(0, -250);
   await expect.poll(scrollTop).toBe(0);
-  await page.evaluate(() => {
-    const editor = (window as any).monaco.editor.getEditors().find(
-      (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
-    );
-    editor.setScrollTop(editor.getScrollHeight());
-  });
+  await page.mouse.wheel(0, 10000);
   await expect.poll(scrollTop).toBeGreaterThan(1000);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page.waitForTimeout(200);
   await page.mouse.wheel(0, 500);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 });
@@ -210,6 +207,21 @@ test("switches and remembers documentation choices", async ({ page }) => {
   await dialectTabs.getByText("MySQL", { exact: true }).click();
   await expect(dialectTabs.locator(':scope > input[type="radio"]').nth(1)).toBeChecked();
   await expect(dialectTabs).toContainText("asyncmy");
+});
+
+test("uses readable tab URLs", async ({ page }) => {
+  await page.goto("/dialects/");
+  const dialectTabs = page.locator(".tabbed-set").first();
+  await dialectTabs.getByText("MySQL", { exact: true }).click();
+  await expect(page).toHaveURL(/#mysql$/);
+
+  const mysql = dialectTabs.locator(":scope > .tabbed-content > .tabbed-block").nth(1);
+  await mysql.getByText("pip", { exact: true }).click();
+  await expect(page).toHaveURL(/#mysql-pip$/);
+
+  await page.goto("/dialects/#sqlite");
+  await expect(page.locator("#sqlite")).toBeChecked();
+  await expect(page.locator('input[id^="__tabbed_"]')).toHaveCount(0);
 });
 
 test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {
