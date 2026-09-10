@@ -7,7 +7,7 @@ same example against the real Pysely package.
 Build the generated assets from the repository root:
 
 ```console
-npm ci --prefix playground
+npm ci --ignore-scripts --prefix playground
 npm run build --prefix playground
 uv build --wheel --out-dir docs/wheels
 uv run --no-sync zensical build --clean
@@ -16,6 +16,8 @@ uv run --no-sync zensical build --clean
 `scripts/build-assets.mjs` packages the pinned Pyright typeshed and the real
 `src/pysely` Python sources. The generated manifest records the checker version,
 source revision, Python targets, schema hash, and typeshed size/hash.
+The install skips the pinned Pyright repository's monorepo bootstrap; all packages
+used by the browser worker are declared directly in `package.json`.
 
 To upgrade Pyright, update the version and source revision in `package.json` and
 `scripts/build-assets.mjs`, rebuild, then run the stock language-server typing

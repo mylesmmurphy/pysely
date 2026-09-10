@@ -36,7 +36,10 @@ function textFiles(directory, prefix) {
 
 mkdirSync(output, { recursive: true });
 const typeshed = filesUnder(join(pyright, "packages/pyright-internal/typeshed-fallback"));
-const typeshedArchive = zipSync(typeshed, { level: 9 });
+const typeshedArchive = zipSync(typeshed, {
+  level: 9,
+  mtime: new Date("1980-01-02T00:00:00Z"),
+});
 writeFileSync(join(output, "typeshed-fallback.zip"), typeshedArchive);
 
 const userFiles = {

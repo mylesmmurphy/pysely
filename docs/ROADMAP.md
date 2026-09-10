@@ -58,9 +58,13 @@ Exit: all release acceptance criteria in the architecture handoff are evidenced.
 
 - Generate interfaces that work with Pylance, Pyright, and ordinary mypy without a
   plugin or background watcher.
-- Expand language-server tests for invalid tables, ambiguity, values, writes,
-  projections, aliases, nullable joins, helpers, and multiple generated schemas.
-- Verify representative behavior in VS Code/Pylance and PyCharm separately.
+- Use the stock local Pyright language server over stdio as the primary automated
+  editor contract. Expand those LSP tests for invalid tables, ambiguity, values,
+  writes, projections, aliases, nullable joins, helpers, and multiple schemas.
+- Keep browser automation focused on a small playground integration smoke suite;
+  do not duplicate the portable typing matrix in Playwright.
+- Verify representative behavior in VS Code/Pylance and PyCharm manually before
+  releases. A VS Code-hosted test harness is optional, not a release prerequisite.
 - Keep custom LSP and editor-extension work paused unless measured portable gaps
   justify it after the core API and code generator stabilize.
 
