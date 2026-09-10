@@ -335,7 +335,8 @@
           return;
         }
         const top = root.querySelector("#playground-query").getBoundingClientRect().top;
-        const height = Math.max(260, Math.min(640, window.innerHeight - top - 80));
+        const parametersHeight = root.querySelector(".pysely-playground__parameters").getBoundingClientRect().height;
+        const height = Math.max(260, Math.min(640, window.innerHeight - top - parametersHeight - 16));
         root.style.setProperty("--pysely-editor-height", `${height}px`);
       };
       const wheelDisposers = editors.map(editor => {

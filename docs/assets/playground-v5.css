@@ -1,0 +1,7 @@
+@import url("playground.css?build=7");
+
+body:has(.pysely-playground) .md-main__inner { margin-top: 12px; }
+body:has(.pysely-playground) .md-content__inner { padding-top: 0; }
+body:has(.pysely-playground) .md-content__inner::before { height: 0; }
+body:has(.pysely-playground) .md-content__button,
+body:has(.pysely-playground) .md-typeset > h1#__skip { display: none; }
