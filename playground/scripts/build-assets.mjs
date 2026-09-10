@@ -45,6 +45,7 @@ writeFileSync(join(output, "typeshed-fallback.zip"), typeshedArchive);
 const userFiles = {
   ...textFiles(join(root, "src/pysely"), "site-packages/pysely"),
   "workspace/database.py": readFileSync(join(root, "docs/assets/examples/database.py"), "utf8"),
+  "workspace/playground/__init__.pyi": readFileSync(join(root, "playground/__init__.pyi"), "utf8"),
 };
 const manifest = {
   pyselyVersion: "0.1.0.dev0",

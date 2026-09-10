@@ -18,7 +18,7 @@ nav = [
 extra_css = ["assets/playground-v4.css"]
 extra_javascript = [
   "assets/site.js",
-  "assets/playground-v5.js",
+  "assets/playground-v6.js",
 ]
 
 [project.extra]

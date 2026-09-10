@@ -108,7 +108,10 @@ def evaluate_playground(schema_code, database_code, query_code, dialect_name):
         database = types.ModuleType("database")
         sys.modules["database"] = database
         exec(compile(database_code, "database.py", "exec"), database.__dict__)
-        namespace = {"dialect": compilation_dialect(dialect_name)}
+        environment = types.ModuleType("playground")
+        environment.dialect = compilation_dialect(dialect_name)
+        sys.modules["playground"] = environment
+        namespace = {}
         exec(compile(query_code, "query.py", "exec"), namespace)
         compiled = namespace["compiled"]
         return json.dumps(

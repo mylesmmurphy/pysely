@@ -1,11 +1,7 @@
-from typing import cast
-
 from database import Database
 
-from pysely.dialect import Dialect
+from playground import dialect
 
-# The playground supplies the selected dialect.
-dialect = cast(Dialect, globals()["dialect"])
 db = Database(dialect=dialect)
 species = "dog"
 
