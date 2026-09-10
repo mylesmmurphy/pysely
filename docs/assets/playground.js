@@ -317,7 +317,7 @@
       const examples = await Promise.all([schemaResponse.text(), queryResponse.text()]);
       const monaco = window.monaco;
       const options = { automaticLayout: true, minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false,
-        scrollbar: { alwaysConsumeMouseWheel: false },
+        scrollbar: { alwaysConsumeMouseWheel: false, vertical: "visible", horizontal: "visible", verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
         padding: { top: 12 }, tabSize: 4, wordWrap: "on", fixedOverflowWidgets: true,
         quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
       const models = [
@@ -329,6 +329,33 @@
       const editors = ["schema", "query", "sql"].map((name, index) => monaco.editor.create(
         root.querySelector(`#playground-${name}`), { ...options, model: models[index], readOnly: index === 2, ariaLabel: `${name} editor` },
       ));
+      const fitEditors = () => {
+        if (window.innerWidth <= 1000) {
+          root.style.removeProperty("--pysely-editor-height");
+          return;
+        }
+        const top = root.querySelector("#playground-query").getBoundingClientRect().top;
+        const height = Math.max(260, Math.min(640, window.innerHeight - top - 80));
+        root.style.setProperty("--pysely-editor-height", `${height}px`);
+      };
+      const wheelDisposers = editors.map(editor => {
+        const element = editor.getDomNode();
+        const onWheel = event => {
+          if (!event.deltaY) return;
+          const atTop = editor.getScrollTop() <= 0;
+          const atBottom = editor.getScrollTop() + editor.getLayoutInfo().height >= editor.getScrollHeight() - 1;
+          if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
+            window.scrollBy(0, event.deltaY * scale);
+          }
+        };
+        element.addEventListener("wheel", onWheel, { capture: true, passive: false });
+        return () => element.removeEventListener("wheel", onWheel, { capture: true });
+      });
+      fitEditors();
+      window.addEventListener("resize", fitEditors);
       const theme = () => monaco.editor.setTheme(document.body.dataset.mdColorScheme === "slate" ? "vs-dark" : "vs");
       theme();
       const observer = new MutationObserver(theme);
@@ -418,7 +445,7 @@
           .catch(failure => { console.error("Could not start Pyright", failure); });
       };
       intelligenceRetry.onclick = loadIntelligence;
-      cleanup = () => { stop(); stopIntelligence(); observer.disconnect(); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      cleanup = () => { stop(); stopIntelligence(); observer.disconnect(); window.removeEventListener("resize", fitEditors); wheelDisposers.forEach(dispose => dispose()); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
       setTimeout(() => loadIntelligence().finally(run), 500);
     } catch (failure) {
       status.textContent = "Could not load playground";

@@ -20,7 +20,7 @@ body:has(.pysely-playground) .md-content { min-width: 0; }
 .pysely-playground__panes section + section { border-left: 1px solid var(--md-default-fg-color--lightest); }
 .pysely-playground__panes h2 { margin: 0; padding: 12px 16px; font-size: 14px; font-weight: 600; }
 .pysely-playground__panes small { float: right; font-weight: 400; opacity: .6; }
-.pysely-editor { height: clamp(240px, calc(100dvh - 260px), 720px); position: relative; }
+.pysely-editor { height: var(--pysely-editor-height, clamp(260px, calc(100dvh - 340px), 640px)); position: relative; }
 .pysely-editor__loading { position: absolute; inset: 0; padding: 14px 16px; background: var(--md-code-bg-color); color: var(--md-code-fg-color); font-family: var(--md-code-font-family); font-size: 14px; }
 .pysely-playground__parameters { display: flex; gap: 16px; padding: 12px 16px; border-top: 1px solid var(--md-default-fg-color--lightest); font-size: 13px; }
 .pysely-playground__parameters code { white-space: pre-wrap; }

@@ -65,7 +65,7 @@ test("scrolls editors and passes wheel scrolling to the page at the boundary", a
     window.scrollTo(0, 0);
   });
   const bounds = (await page.locator("#playground-query").boundingBox())!;
-  expect(bounds.y + bounds.height).toBeLessThan(900);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(820);
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   const scrollTop = () => page.evaluate(() => (window as any).monaco.editor.getEditors().find(
     (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
