@@ -51,8 +51,9 @@ async with Pysely(schema=Database, dialect=SqliteDialect(database=database)) as 
     )
 ```
 
-All values are passed separately from the generated SQL as driver parameters.
+Pysely passes values to the driver separately from generated SQL.
 
-The [typing guide](typing.md) describes the standard-editor generated interface
-now under development and the optional mypy checks available today. Try query
-compilation in the [playground](playground.md).
+Next:
+
+- Read the [typing guide](typing.md).
+- Try the [playground](playground.md).

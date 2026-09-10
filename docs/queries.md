@@ -15,14 +15,11 @@ compiled = query.compile()
 rows = await query.execute()
 ```
 
-Use `execute_take_first()` when zero or one row is expected, or
-`execute_take_first_or_throw()` when a missing row is an error.
-
-These queries use the schema passed as `schema=Database`; see
-[Schema and typing](typing.md). Ambiguous columns must be qualified with their
-table or alias. The object-based expression API remains available for queries that
-use table and column objects. String writes use the same database schema and query
-compiler.
+- `execute_take_first()` returns zero or one row.
+- `execute_take_first_or_throw()` raises when no row exists.
+- Pass `schema=Database` for schema-aware string queries.
+- Qualify ambiguous columns with their table or alias.
+- Use table and column objects for expression-based queries.
 
 ### Portable typed aliases
 

@@ -17,8 +17,11 @@ Status: complete.
 - Driver and connection protocols, plugin pipeline, result types, and SQLite driver.
 - Async execution, resource providers, transactions, savepoints, and cleanup.
 - PostgreSQL and MySQL adapters with live CI wiring.
+- Add Psycopg 3 async and `psycopg_pool` support for PostgreSQL.
+- Add aiomysql support for MySQL and MariaDB.
 
-Status: complete for PostgreSQL, MySQL, and SQLite.
+Status: PostgreSQL with asyncpg, MySQL with asyncmy, and SQLite with aiosqlite are
+complete. Psycopg 3 and aiomysql adapters are planned.
 
 ## Stage 3: SQL surface
 

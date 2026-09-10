@@ -1,10 +1,12 @@
 # Schema and typing
 
-Pysely's baseline typing target is ordinary Python tooling: annotated schemas,
-standard annotations, and no required checker plugin. VS Code with Pylance is the
-primary target.
+Pysely works with ordinary Python tooling. No checker plugin is required.
 
-The current runtime schema remains simple:
+- Annotated schemas provide runtime name validation.
+- Schema-specific interfaces provide completions and static checks.
+- VS Code with Pylance is the primary editor target.
+
+Runtime schemas use annotated classes:
 
 ```python
 class PersonTable:
@@ -25,9 +27,11 @@ This form validates names at runtime. Its portable result type is the conservati
 
 ## Schema-specific interfaces
 
-Schema-specific interfaces use `Literal` names, overloads, and generic query scope.
-They support table and in-scope column completion, reject invalid names, and execute
-through the standard Pysely runtime.
+Schema-specific interfaces provide:
+
+- Table and in-scope column completion.
+- Static rejection of invalid table and column names.
+- Execution through the standard Pysely runtime.
 
 Database introspection and the `pysely codegen` command are not implemented. Until
 they ship, defining a schema-specific interface is a manual step.
@@ -46,19 +50,16 @@ they ship, defining a schema-specific interface is a manual step.
 | Outer-join nullability | Not yet implemented |
 | PyCharm support | Not documented |
 
-Chained `.select_as()` calls accumulate literal result keys without a fixed
-projection-count limit. When aliases select different value types, the mapping's
-value type widens to their safe union. Duplicate aliases do the same. A dynamic
-alias cannot provide a finite key completion set and therefore falls back to a
+Chained `.select_as()` calls retain literal result keys without a fixed projection
+limit. Different value types, duplicate aliases, and dynamic aliases use a safe,
 broader mapping type.
 
 ## Editor diagnostics
 
-A failed call can underline the preceding fluent chain because the checker treats
-that chain as the call's receiver. This also happens for missing arguments in
-non-overloaded methods. Invalid columns in ordinary `where` and `select` calls
-already receive argument-sized diagnostics; failed overloads can additionally
-cause unknown-type errors in later calls.
+Language servers may underline a larger fluent chain when a call fails, because
+the chain is the call's receiver. Failed overloads and missing arguments can also
+produce follow-on unknown-type errors. Ordinary invalid `where` and `select`
+columns receive argument-sized diagnostics.
 
 Fluent chaining is the intended API. The playground forwards language-server
 diagnostics and does not add execution errors as editor markers.
@@ -75,12 +76,12 @@ result = selected.select_as("pet.name", "pet_name")
 ```
 
 Each variable keeps a distinct name because joins and projections change the
-query's static type. Fluent chaining remains the normal Pysely style; this form is
-only useful when a checker attaches a call-level error to a larger chain.
+query's static type. Fluent chaining is the normal Pysely style; use this form
+only when a checker attaches a call-level error to a larger chain.
 
 ## Optional mypy checks
 
-The existing plugin remains an optional enhancement:
+The mypy plugin is optional:
 
 ```toml
 [tool.mypy]
@@ -88,18 +89,17 @@ plugins = ["pysely.mypy"]
 ```
 
 It checks literal table and column names, comparison values, write keys, and some
-projected result shapes. It is not required by Pysely at runtime and is no longer
-the foundation of the default typing design.
+projected result shapes. It is optional and has no runtime dependency.
 
 ## Syntax differences from Kysely
 
 Pysely prefers `.select_as("pet.name", "pet_name")` for portable typed aliases.
-Kysely can infer the alias embedded in `"pet.name as pet_name"` using TypeScript's
-string-literal type operations. Standard Python typing cannot perform that string
-split. Keeping source and alias separate lets generated overloads preserve a direct
-alias literal and map the source column to its value type. The combined string form
-still compiles at runtime, but does not promise the same static inference.
+Python typing cannot split an arbitrary `"pet.name as pet_name"` string into a
+source type and result key.
 
-The browser [playground](playground.md) runs the real Pysely package for query
-compilation and upstream Pyright for editor intelligence. It does not invent
-completion results that a standard editor may not provide.
+- Direct literal aliases retain key completion and value information.
+- Dynamic or conflicting aliases use conservative result types.
+- The single-string form compiles at runtime without the same static inference.
+
+The browser [playground](playground.md) runs Pysely for query compilation and
+Pyright for editor intelligence.
