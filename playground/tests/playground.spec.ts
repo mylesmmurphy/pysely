@@ -116,6 +116,21 @@ test("labels playground navigation as an interactive editor", async ({ page }) =
   await expect(link).toHaveClass(/md-footer__link--playground/);
 });
 
+test("switches and remembers documentation choices", async ({ page }) => {
+  await page.goto("/getting-started/");
+  const installTabs = page.locator(".tabbed-set").first();
+  await installTabs.getByText("pip", { exact: true }).click();
+  await expect(installTabs.locator('input[type="radio"]').nth(1)).toBeChecked();
+
+  await page.goto("/dialects/");
+  const dialectTabs = page.locator(".tabbed-set").first();
+  const packageTabs = dialectTabs.locator(".tabbed-set").first();
+  await expect(packageTabs.locator('input[type="radio"]').nth(1)).toBeChecked();
+  await dialectTabs.getByText("MySQL", { exact: true }).click();
+  await expect(dialectTabs.locator(':scope > input[type="radio"]').nth(1)).toBeChecked();
+  await expect(dialectTabs).toContainText("asyncmy");
+});
+
 test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");

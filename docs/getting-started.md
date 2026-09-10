@@ -4,15 +4,17 @@
 
 Install the development release with the driver extra for your database:
 
-```bash
-uv add --prerelease allow "pysely[sqlite]"
-```
+=== "uv"
 
-With pip:
+    ```bash
+    uv add --prerelease allow "pysely[sqlite]"
+    ```
 
-```bash
-pip install --pre "pysely[sqlite]"
-```
+=== "pip"
+
+    ```bash
+    pip install --pre "pysely[sqlite]"
+    ```
 
 Use `postgres` or `mysql` instead of `sqlite` for those databases. Pysely is
 currently a pre-alpha development release.
@@ -35,14 +37,52 @@ class Database:
 
 ## Connect and query
 
+=== "SQLite"
+
+    ```python
+    import aiosqlite
+
+    from pysely import SqliteDialect
+
+    database = await aiosqlite.connect("app.db", isolation_level=None)
+    dialect = SqliteDialect(database=database)
+    ```
+
+=== "PostgreSQL"
+
+    ```python
+    import asyncpg
+
+    from pysely import PostgresDialect
+
+    pool = await asyncpg.create_pool("postgresql://user:password@localhost/app")
+    dialect = PostgresDialect(pool=pool)
+    ```
+
+=== "MySQL"
+
+    ```python
+    import asyncmy
+
+    from pysely import MysqlDialect
+
+    pool = await asyncmy.create_pool(
+        host="127.0.0.1",
+        user="app",
+        password="secret",
+        db="app",
+        autocommit=True,
+    )
+    dialect = MysqlDialect(pool=pool)
+    ```
+
+Pass the selected dialect to Pysely:
+
 ```python
-import aiosqlite
-
-from pysely import Pysely, SqliteDialect
+from pysely import Pysely
 
 
-database = await aiosqlite.connect("app.db", isolation_level=None)
-async with Pysely(schema=Database, dialect=SqliteDialect(database=database)) as db:
+async with Pysely(schema=Database, dialect=dialect) as db:
     rows = await (
         db.select_from("users")
         .select(["id", "email"])
