@@ -312,9 +312,13 @@
         scrollbar: { alwaysConsumeMouseWheel: false, vertical: "visible", horizontal: "visible", verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
         padding: { top: 12 }, tabSize: 4, wordWrap: "on", fixedOverflowWidgets: true,
         quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
+      const schemaUri = monaco.Uri.parse("file:///workspace/schema.py");
+      const queryUri = monaco.Uri.parse("file:///workspace/query.py");
+      monaco.editor.getModel(schemaUri)?.dispose();
+      monaco.editor.getModel(queryUri)?.dispose();
       const models = [
-        monaco.editor.createModel(examples[0], "python", monaco.Uri.parse("file:///workspace/schema.py")),
-        monaco.editor.createModel(examples[1], "python", monaco.Uri.parse("file:///workspace/query.py")),
+        monaco.editor.createModel(examples[0], "python", schemaUri),
+        monaco.editor.createModel(examples[1], "python", queryUri),
         monaco.editor.createModel("", "sql"),
       ];
       for (const name of ["schema", "query", "sql"]) root.querySelector(`#playground-${name}`).textContent = "";

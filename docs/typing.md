@@ -68,9 +68,6 @@ the chain is the call's receiver. Failed overloads and missing arguments can als
 produce follow-on unknown-type errors. The invalid argument still receives its
 own argument-sized diagnostic.
 
-Fluent chaining is the intended API. The playground forwards language-server
-diagnostics and does not add execution errors as editor markers.
-
 For a temporarily tighter diagnostic range, the same builder can be written as
 separate calls while locating an error:
 
