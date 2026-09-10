@@ -66,7 +66,10 @@ test("keeps real execution available", async ({ page }) => {
 test("highlights a bad argument without underlining the query chain", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
-  await replaceQuery(page, `${prefix}compiled = (
+  await page.evaluate(code => {
+    const monaco = (window as any).monaco;
+    monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
+  }, `${prefix}compiled = (
     db.select_from("person")
     .inner_join("pett", "owner_id", "person.id")
     .where("first_name", "=", "Jennifer")
