@@ -36,3 +36,10 @@ hide:
   worker.
 - The [typing guide](typing.md) covers the generated types used by standard Python
   editors.
+
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
+
+[← Schema and typing](typing.md){ .md-button }
+[Dialects →](dialects.md){ .md-button .md-button--primary }
+
+</nav>

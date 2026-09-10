@@ -107,3 +107,10 @@ columns have different value types, the dictionary value type is their union.
 
 The browser [playground](playground.md) runs Pysely for query compilation and
 Pyright for editor intelligence.
+
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
+
+[← Queries](queries.md){ .md-button }
+[Open playground editor →](playground.md){ .md-button .md-button--primary }
+
+</nav>

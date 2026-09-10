@@ -110,3 +110,10 @@ async with db.connection() as connection_db:
     first = await connection_db.select_from("person").select("id").execute()
     second = await connection_db.select_from("person").select("first_name").execute()
 ```
+
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
+
+[← Getting started](getting-started.md){ .md-button }
+[Schema and typing →](typing.md){ .md-button .md-button--primary }
+
+</nav>

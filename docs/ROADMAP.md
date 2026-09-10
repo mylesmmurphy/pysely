@@ -80,3 +80,9 @@ completion providers are not part of the product.
 
 - Add MSSQL and PGlite runtime adapters after the PostgreSQL, MySQL, and SQLite
   production gates are complete.
+
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
+
+[← Project status](project-status.md){ .md-button }
+
+</nav>

@@ -93,7 +93,9 @@ async with Pysely(schema=Database, dialect=dialect) as db:
 
 Pysely passes values to the driver separately from generated SQL.
 
-Next:
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 
-- Read the [typing guide](typing.md).
-- Try the [playground](playground.md).
+[← Home](index.md){ .md-button }
+[Queries →](queries.md){ .md-button .md-button--primary }
+
+</nav>

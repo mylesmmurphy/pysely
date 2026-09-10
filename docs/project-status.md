@@ -27,4 +27,9 @@ Pysely is under active development and is not production-ready.
 
 MSSQL and PGlite runtime adapters are post-readiness work.
 
-See the [implementation roadmap](ROADMAP.md) for staged acceptance targets.
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
+
+[← Dialects](dialects.md){ .md-button }
+[Roadmap →](ROADMAP.md){ .md-button .md-button--primary }
+
+</nav>

@@ -110,21 +110,17 @@ test("keeps real execution available", async ({ page }) => {
 
 test("labels playground navigation as an interactive editor", async ({ page }) => {
   await page.goto("/typing/");
-  const link = page.locator('.md-footer__link[href$="/playground/"]');
+  const link = page.locator('.pysely-page-nav a[href$="/playground/"]');
   await expect(link).toContainText("Open playground editor");
-  await expect(link).toHaveClass(/md-footer__link--playground/);
-  await expect(link).toHaveClass(/md-footer__link--primary/);
+  await expect(link).toHaveClass(/md-button--primary/);
 });
 
-test("shows footer navigation as single-label buttons", async ({ page }) => {
+test("shows page navigation inside the content", async ({ page }) => {
   await page.goto("/queries/");
-  const previous = page.locator(".md-footer__link--prev");
-  const next = page.locator(".md-footer__link--next");
-  await expect(previous.locator(".md-footer__direction")).toBeHidden();
-  await expect(next.locator(".md-footer__direction")).toBeHidden();
-  await expect(previous.locator(".md-ellipsis")).toHaveText("Getting started");
-  await expect(next.locator(".md-ellipsis")).toHaveText("Schema and typing");
-  await expect(next).toHaveClass(/md-footer__link--primary/);
+  const navigation = page.locator("main .pysely-page-nav");
+  await expect(navigation.getByRole("link", { name: "← Getting started" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Schema and typing →" })).toBeVisible();
+  await expect(page.locator(".md-footer__link")).toHaveCount(0);
 });
 
 test("switches and remembers documentation choices", async ({ page }) => {

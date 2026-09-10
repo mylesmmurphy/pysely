@@ -1,0 +1,21 @@
+.pysely-home-link { color: inherit; }
+
+.md-typeset .md-button { border-radius: 999px; }
+.pysely-page-nav {
+  display: flex;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+.pysely-page-nav > p {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+}
+.pysely-page-nav .md-button:last-child { margin-left: auto; }
+
+@media (max-width: 600px) {
+  .pysely-page-nav > p { align-items: stretch; flex-direction: column; }
+  .pysely-page-nav .md-button:last-child { margin-left: 0; }
+}

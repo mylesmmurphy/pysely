@@ -98,3 +98,10 @@ Install only the driver needed by the application.
 
     SQLite databases must use autocommit. Use `async with` or call
     `await db.destroy()` to close the database.
+
+<nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
+
+[← Playground editor](playground.md){ .md-button }
+[Project status →](project-status.md){ .md-button .md-button--primary }
+
+</nav>

@@ -14,10 +14,11 @@ nav = [
   { "Playground" = "playground.md" },
   { "Dialects" = "dialects.md" },
   { "Project status" = "project-status.md" },
+  { "Roadmap" = "ROADMAP.md" },
 ]
-extra_css = ["assets/site-v2.css", "assets/playground-v5.css"]
+extra_css = ["assets/site-v3.css", "assets/playground-v5.css"]
 extra_javascript = [
-  "assets/site-v2.js",
+  "assets/site-v3.js",
   "assets/playground-v8.js",
 ]
 
@@ -33,7 +34,6 @@ features = [
   "navigation.instant",
   "navigation.path",
   "navigation.sections",
-  "navigation.footer",
   "navigation.top",
   "toc.follow",
 ]
