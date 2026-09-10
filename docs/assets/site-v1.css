@@ -1,0 +1,32 @@
+.pysely-home-link { color: inherit; }
+
+.md-footer { background: var(--md-default-bg-color); }
+.md-footer__inner { gap: 12px; padding: 24px 16px; }
+.md-footer__link {
+  flex: 0 1 auto;
+  margin: 0;
+  padding: 10px 20px;
+  border: 2px solid var(--md-primary-fg-color);
+  border-radius: 3px;
+  color: var(--md-primary-fg-color);
+  font-weight: 700;
+}
+.md-footer__link--next { margin-left: auto; }
+.md-footer__link:hover {
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+}
+.md-footer__direction { color: inherit; opacity: .7; }
+.md-footer__button { margin: 0 8px; }
+.md-footer__link--playground,
+.md-footer__link--playground:hover {
+  border-color: var(--md-primary-fg-color);
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+}
+
+@media (max-width: 600px) {
+  .md-footer__inner { align-items: stretch; flex-direction: column; }
+  .md-footer__link,
+  .md-footer__link--next { justify-content: space-between; margin: 0; }
+}

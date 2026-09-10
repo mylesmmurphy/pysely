@@ -30,4 +30,5 @@ MSSQL and PGlite runtime adapters are deferred until the primary dialects meet
 the production-readiness gates.
 
 [Get started](getting-started.md){ .md-button .md-button--primary }
+[Open interactive editor](playground.md){ .md-button }
 [View on GitHub](https://github.com/mylesmmurphy/pysely){ .md-button }

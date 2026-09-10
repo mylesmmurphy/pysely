@@ -108,6 +108,14 @@ test("keeps real execution available", async ({ page }) => {
   expect(query).toContain('rows[0]["pet_name"]');
 });
 
+test("labels playground navigation as an interactive editor", async ({ page }) => {
+  await page.goto("/typing/");
+  const link = page.locator('.md-footer__link[href$="/playground/"]');
+  await expect(link).toContainText("Interactive editor");
+  await expect(link).toContainText("Open playground");
+  await expect(link).toHaveClass(/md-footer__link--playground/);
+});
+
 test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
