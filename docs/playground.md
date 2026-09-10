@@ -39,7 +39,6 @@ hide:
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 
-[← Schema and typing](typing.md){ .md-button }
-[Dialects →](dialects.md){ .md-button .md-button--primary }
+[← Roadmap](ROADMAP.md){ .md-button }
 
 </nav>

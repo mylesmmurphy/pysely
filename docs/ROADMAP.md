@@ -84,5 +84,6 @@ completion providers are not part of the product.
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 
 [← Project status](project-status.md){ .md-button }
+[Open playground editor ↗](playground.md){ .md-button .md-button--primary }
 
 </nav>

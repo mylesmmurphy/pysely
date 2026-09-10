@@ -14,6 +14,11 @@
   margin: 0;
 }
 .pysely-page-nav .md-button:last-child { margin-left: auto; }
+.md-nav--primary > .md-nav__list > .md-nav__item:last-child {
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
 
 @media (max-width: 600px) {
   .pysely-page-nav > p { align-items: stretch; flex-direction: column; }

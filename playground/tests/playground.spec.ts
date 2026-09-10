@@ -36,6 +36,7 @@ joined.where("")`);
   await page.keyboard.insertText("s");
   await expect(page.locator(".suggest-widget.visible")).toContainText("species");
   await expect(page.locator(".suggest-widget.visible")).toContainText("pet.species");
+  await expect(page.locator(".suggest-widget.visible")).toContainText("status");
 
   await page.keyboard.press("Escape");
   await replaceQuery(page, `${prefix}query = db.select_from("person")
@@ -97,7 +98,7 @@ test("keeps real execution available", async ({ page }) => {
   expect(gap).toBeLessThanOrEqual(20);
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
   await expect(page.locator("#playground-sql")).toContainText(
-    'select "first_name", "pet"."name" as "pet_name"',
+    'select "first_name", "status", "pet"."name" as "pet_name"',
   );
   const query = await page.evaluate(() => {
     const monaco = (window as any).monaco;
@@ -105,14 +106,37 @@ test("keeps real execution available", async ({ page }) => {
   });
   expect(query).toContain("rows = await query.execute()");
   expect(query).toContain('rows[0]["first_name"]');
+  expect(query).toContain('rows[0]["status"]');
   expect(query).toContain('rows[0]["pet_name"]');
+  expect(query).toContain('rows[0]["pet_birth_date"]');
 });
 
 test("labels playground navigation as an interactive editor", async ({ page }) => {
-  await page.goto("/typing/");
+  await page.goto("/ROADMAP/");
   const link = page.locator('.pysely-page-nav a[href$="/playground/"]');
   await expect(link).toContainText("Open playground editor");
+  await expect(link).toContainText("↗");
   await expect(link).toHaveClass(/md-button--primary/);
+});
+
+test("separates playground at the bottom of the docs navigation", async ({ page }) => {
+  await page.goto("/queries/");
+  const items = page.locator('.md-nav--primary > .md-nav__list > .md-nav__item');
+  const playground = items.last();
+  await expect(playground).toContainText("Playground ↗");
+  expect(await playground.evaluate(item => getComputedStyle(item).borderTopStyle)).toBe("solid");
+});
+
+test("restores Monaco after instant navigation", async ({ page }) => {
+  await page.goto("/playground/");
+  await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
+  await page.getByRole("link", { name: "Pysely", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link", { name: /Open interactive editor/ }).click();
+  const editor = page.locator("#playground-query .monaco-editor");
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveCSS("position", "relative");
+  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
 });
 
 test("shows page navigation inside the content", async ({ page }) => {

@@ -9,9 +9,16 @@ Pysely works with ordinary Python tooling. No checker plugin is required.
 Runtime schemas use annotated classes:
 
 ```python
+from datetime import datetime
+from typing import Literal
+
+
 class PersonTable:
     id: int
     first_name: str
+    nickname: str | None
+    status: Literal["active", "inactive"]
+    created_at: datetime
 
 
 class Database:
@@ -111,6 +118,6 @@ Pyright for editor intelligence.
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 
 [← Queries](queries.md){ .md-button }
-[Open playground editor →](playground.md){ .md-button .md-button--primary }
+[Dialects →](dialects.md){ .md-button .md-button--primary }
 
 </nav>

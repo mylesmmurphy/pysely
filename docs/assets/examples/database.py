@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+from decimal import Decimal
 from typing import (
     Any,
     Literal,
@@ -16,15 +18,31 @@ from schema import DatabaseSchema
 from pysely import Pysely, TypedSchemaQueryBuilder
 from pysely.dialect import Dialect
 
-PersonColumns: TypeAlias = Literal["person.id", "person.first_name", "first_name"]
+PersonColumns: TypeAlias = Literal[
+    "person.id",
+    "person.first_name",
+    "person.last_name",
+    "person.status",
+    "person.verified",
+    "person.created_at",
+    "first_name",
+    "last_name",
+    "status",
+    "verified",
+    "created_at",
+]
 PetColumns: TypeAlias = Literal[
     "pet.id",
     "pet.owner_id",
     "pet.name",
     "pet.species",
+    "pet.birth_date",
+    "pet.weight_kg",
     "owner_id",
     "name",
     "species",
+    "birth_date",
+    "weight_kg",
 ]
 TableName: TypeAlias = Literal["person", "pet"]
 AllColumns: TypeAlias = PersonColumns | PetColumns
@@ -63,6 +81,44 @@ class DatabaseQuery(
 
     @overload
     def select(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        selections: Literal["person.last_name", "last_name"],
+    ) -> DatabaseQuery[
+        ColumnT | PersonColumns,
+        ResultKeyT | Literal["last_name"],
+        ResultValueT | str | None,
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        selections: Literal["person.status", "status"],
+    ) -> DatabaseQuery[
+        ColumnT | PersonColumns,
+        ResultKeyT | Literal["status"],
+        ResultValueT | Literal["active", "inactive"],
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        selections: Literal["person.verified", "verified"],
+    ) -> DatabaseQuery[
+        ColumnT | PersonColumns, ResultKeyT | Literal["verified"], ResultValueT | bool
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        selections: Literal["person.created_at", "created_at"],
+    ) -> DatabaseQuery[
+        ColumnT | PersonColumns,
+        ResultKeyT | Literal["created_at"],
+        ResultValueT | datetime,
+    ]: ...
+
+    @overload
+    def select(
         self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
         selections: Literal["pet.owner_id", "owner_id"],
     ) -> DatabaseQuery[
@@ -82,7 +138,29 @@ class DatabaseQuery(
         self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
         selections: Literal["pet.species", "species"],
     ) -> DatabaseQuery[
-        ColumnT | PetColumns, ResultKeyT | Literal["species"], ResultValueT | str
+        ColumnT | PetColumns,
+        ResultKeyT | Literal["species"],
+        ResultValueT | Literal["cat", "dog", "hamster"],
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        selections: Literal["pet.birth_date", "birth_date"],
+    ) -> DatabaseQuery[
+        ColumnT | PetColumns,
+        ResultKeyT | Literal["birth_date"],
+        ResultValueT | date | None,
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        selections: Literal["pet.weight_kg", "weight_kg"],
+    ) -> DatabaseQuery[
+        ColumnT | PetColumns,
+        ResultKeyT | Literal["weight_kg"],
+        ResultValueT | Decimal | None,
     ]: ...
 
     @overload
@@ -105,16 +183,52 @@ class DatabaseQuery(
     @overload
     def select_as(
         self,
-        source: Literal[
-            "person.first_name",
-            "first_name",
-            "pet.name",
-            "name",
-            "pet.species",
-            "species",
-        ],
+        source: Literal["person.first_name", "first_name", "pet.name", "name"],
         alias: AliasT,
     ) -> DatabaseQuery[ColumnT, ResultKeyT | AliasT, ResultValueT | str]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["person.last_name", "last_name"], alias: AliasT
+    ) -> DatabaseQuery[ColumnT, ResultKeyT | AliasT, ResultValueT | str | None]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["person.status", "status"], alias: AliasT
+    ) -> DatabaseQuery[
+        ColumnT,
+        ResultKeyT | AliasT,
+        ResultValueT | Literal["active", "inactive"],
+    ]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["person.verified", "verified"], alias: AliasT
+    ) -> DatabaseQuery[ColumnT, ResultKeyT | AliasT, ResultValueT | bool]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["person.created_at", "created_at"], alias: AliasT
+    ) -> DatabaseQuery[ColumnT, ResultKeyT | AliasT, ResultValueT | datetime]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["pet.species", "species"], alias: AliasT
+    ) -> DatabaseQuery[
+        ColumnT,
+        ResultKeyT | AliasT,
+        ResultValueT | Literal["cat", "dog", "hamster"],
+    ]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["pet.birth_date", "birth_date"], alias: AliasT
+    ) -> DatabaseQuery[ColumnT, ResultKeyT | AliasT, ResultValueT | date | None]: ...
+
+    @overload
+    def select_as(
+        self, source: Literal["pet.weight_kg", "weight_kg"], alias: AliasT
+    ) -> DatabaseQuery[ColumnT, ResultKeyT | AliasT, ResultValueT | Decimal | None]: ...
 
     @overload
     def select_as(

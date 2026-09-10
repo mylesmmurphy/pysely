@@ -25,10 +25,17 @@ Use one annotated class per table and a database class mapping table names to
 those types. These definitions drive runtime column validation.
 
 ```python
+from datetime import datetime
+from typing import Literal
+
+
 class UserTable:
     id: int
     email: str
-    nickname: str | None
+    display_name: str | None
+    role: Literal["admin", "member"]
+    verified: bool
+    created_at: datetime
 
 
 class Database:

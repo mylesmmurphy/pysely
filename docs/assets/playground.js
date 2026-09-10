@@ -136,7 +136,7 @@
     retry.hidden = true;
     try {
       const [manifestResponse, typeshedResponse] = await Promise.all([
-        fetch(new URL("intelligence/manifest.json?build=7", assets)),
+        fetch(new URL("intelligence/manifest.json?build=8", assets)),
         fetch(new URL("intelligence/typeshed-fallback.zip", assets)),
       ]);
       if (!manifestResponse.ok || !typeshedResponse.ok) throw new Error("Could not load Pyright assets");
@@ -273,14 +273,6 @@
 
   function loadEditor() {
     loading ??= new Promise((resolve, reject) => {
-      const stylesheet = document.createElement("link");
-      stylesheet.rel = "stylesheet";
-      stylesheet.href = `${monacoBase}/editor/editor.main.css`;
-      const stylesReady = new Promise((stylesResolve, stylesReject) => {
-        stylesheet.onload = stylesResolve;
-        stylesheet.onerror = stylesReject;
-      });
-      document.head.append(stylesheet);
       const script = document.createElement("script");
       script.src = `${monacoBase}/loader.js`;
       script.onerror = () => reject(new Error("Could not load the code editor."));
@@ -291,7 +283,7 @@
           ], { type: "text/javascript" })),
         };
         window.require.config({ paths: { vs: monacoBase } });
-        window.require(["vs/editor/editor.main"], () => stylesReady.then(resolve, reject), reject);
+        window.require(["vs/editor/editor.main"], resolve, reject);
       };
       document.head.append(script);
     }).catch(error => {
@@ -310,7 +302,7 @@
     const error = root.querySelector("#playground-error");
     try {
       const [, schemaResponse, queryResponse] = await Promise.all([
-        loadEditor(), fetch(new URL("examples/schema.py?build=6", assets)), fetch(new URL("examples/query.py?build=7", assets)),
+        loadEditor(), fetch(new URL("examples/schema.py?build=7", assets)), fetch(new URL("examples/query.py?build=8", assets)),
       ]);
       if (!root.isConnected || version !== mountVersion) return;
       if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");
