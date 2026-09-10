@@ -104,12 +104,27 @@ test("hands scrolling to the page on the next gesture at the editor boundary", a
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   await page.mouse.wheel(0, -250);
   await expect.poll(scrollTop).toBe(0);
-  await page.mouse.wheel(0, 10000);
+  await page.evaluate(() => {
+    const editor = (window as any).monaco.editor.getEditors().find(
+      (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
+    );
+    const element = editor.getDomNode();
+    element.dispatchEvent(new WheelEvent("wheel", { deltaY: 10000, bubbles: true, cancelable: true }));
+    element.dispatchEvent(new WheelEvent("wheel", { deltaY: 500, bubbles: true, cancelable: true }));
+  });
   await expect.poll(scrollTop).toBeGreaterThan(1000);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  await page.waitForTimeout(200);
-  await page.mouse.wheel(0, 500);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.waitForTimeout(100);
+  await page.evaluate(() => {
+    const editor = (window as any).monaco.editor.getEditors().find(
+      (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
+    );
+    const element = editor.getDomNode();
+    for (const deltaY of [1, 100, 400]) {
+      element.dispatchEvent(new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true }));
+    }
+  });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(50);
 });
 
 test("keeps real execution available", async ({ page }) => {

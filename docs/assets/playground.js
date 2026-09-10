@@ -337,7 +337,8 @@
       };
       const wheelDisposers = editors.map(editor => {
         const element = editor.getDomNode();
-        let lastWheelAt = 0;
+        let gesture = null;
+        let gestureTimer;
         const onWheel = event => {
           if (!event.deltaY) return;
           const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
@@ -346,10 +347,20 @@
           const maxScrollTop = editor.getScrollHeight() - editor.getLayoutInfo().height;
           const atTop = scrollTop <= 0;
           const atBottom = scrollTop >= maxScrollTop - 1;
-          const continuingGesture = event.timeStamp - lastWheelAt < 160;
           const crossesTop = delta < 0 && !atTop && scrollTop + delta <= 0;
           const crossesBottom = delta > 0 && !atBottom && scrollTop + delta >= maxScrollTop;
-          lastWheelAt = event.timeStamp;
+          const atBoundary = (delta < 0 && atTop) || (delta > 0 && atBottom);
+
+          if (!gesture) gesture = atBoundary ? "page" : "editor";
+          clearTimeout(gestureTimer);
+          gestureTimer = setTimeout(() => { gesture = null; }, 80);
+
+          if (gesture === "page") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            window.scrollBy(0, delta);
+            return;
+          }
 
           if (crossesTop || crossesBottom) {
             editor.setScrollTop(crossesTop ? 0 : maxScrollTop);
@@ -358,14 +369,16 @@
             return;
           }
 
-          if ((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) {
+          if (atBoundary) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            if (!continuingGesture) window.scrollBy(0, delta);
           }
         };
         element.addEventListener("wheel", onWheel, { capture: true, passive: false });
-        return () => element.removeEventListener("wheel", onWheel, { capture: true });
+        return () => {
+          clearTimeout(gestureTimer);
+          element.removeEventListener("wheel", onWheel, { capture: true });
+        };
       });
       fitEditors();
       window.addEventListener("resize", fitEditors);
