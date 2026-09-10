@@ -62,3 +62,26 @@ test("keeps real execution available", async ({ page }) => {
     'select "first_name", "pet"."name" as "pet_name"',
   );
 });
+
+test("highlights a bad argument without underlining the query chain", async ({ page }) => {
+  await page.goto("/playground/");
+  await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
+  await replaceQuery(page, `${prefix}compiled = (
+    db.select_from("person")
+    .inner_join("pett", "owner_id", "person.id")
+    .where("first_name", "=", "Jennifer")
+    .select("first_name")
+    .compile()
+)`);
+  const markers = () => page.evaluate(() => {
+    const monaco = (window as any).monaco;
+    return monaco.editor.getModelMarkers({}).filter((item: any) => item.resource.path === "/workspace/query.py")
+      .map((item: any) => ({ code: item.code, start: item.startLineNumber, end: item.endLineNumber, owner: item.owner }));
+  });
+  await expect.poll(markers).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: "reportArgumentType" }),
+  ]));
+  const result = await markers();
+  expect(result.every((item: any) => item.start === item.end)).toBe(true);
+  expect(result.some((item: any) => item.code === "reportUnknownMemberType" || item.owner === "pysely")).toBe(false);
+});

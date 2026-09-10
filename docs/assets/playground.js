@@ -126,6 +126,7 @@
   const markdown = value => typeof value === "string" ? value : value?.value || "";
 
   async function startIntelligence(monaco, models, status, retry) {
+    const { groupDiagnostics } = await import(new URL("playground-diagnostics.mjs", assets));
     const startedAt = performance.now();
     let client;
     let worker;
@@ -168,10 +169,14 @@
       client.diagnostics = params => {
         const model = monaco.editor.getModel(monaco.Uri.parse(params.uri));
         if (!model || (params.version && params.version < model.getVersionId())) return;
-        monaco.editor.setModelMarkers(model, "pyright", params.diagnostics.map(item => ({
+        monaco.editor.setModelMarkers(model, "pyright", groupDiagnostics(params.diagnostics, params.uri).map(item => ({
           ...lspRange(item.range), message: item.message, code: item.code,
           severity: [0, monaco.MarkerSeverity.Error, monaco.MarkerSeverity.Warning, monaco.MarkerSeverity.Info, monaco.MarkerSeverity.Hint][item.severity || 4],
           tags: item.tags,
+          relatedInformation: item.relatedInformation.map(info => ({
+            resource: monaco.Uri.parse(info.location.uri),
+            ...lspRange(info.location.range), message: info.message,
+          })),
         })));
       };
       await client.initialize();
@@ -359,10 +364,6 @@
               error.hidden = false;
               models[2].setValue("-- Fix the error to compile this query.");
               root.querySelector("#playground-parameters").textContent = "[]";
-              const model = data.file === "schema.py" ? models[0] : models[1];
-              const line = Math.min(data.line || 1, model.getLineCount());
-              monaco.editor.setModelMarkers(model, "pysely", [{ startLineNumber: line, endLineNumber: line,
-                startColumn: 1, endColumn: model.getLineMaxColumn(line), message: data.error, severity: monaco.MarkerSeverity.Error }]);
             } else {
               status.textContent = "Compiled";
               error.textContent = "";
