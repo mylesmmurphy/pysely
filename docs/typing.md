@@ -53,6 +53,32 @@ value type widens to their safe union. Duplicate aliases do the same. A dynamic
 alias cannot provide a finite key completion set and therefore falls back to a
 broader mapping type.
 
+## Diagnosing a long query
+
+A failed call can underline the preceding fluent chain because the checker treats
+that chain as the call's receiver. This also happens for missing arguments in
+non-overloaded methods. Invalid columns in ordinary `where` and `select` calls
+already receive argument-sized diagnostics; failed overloads can additionally
+cause unknown-type errors in later calls.
+
+While debugging, separate the query into distinct variables to keep a call's
+highlight out of earlier valid stages:
+
+```python
+people = db.select_from("person")
+joined = people.inner_join("pet", "owner_id", "person.id")
+filtered = joined.where("first_name", "=", "Jennifer")
+selected = filtered.select("first_name")
+query = selected.select_as("pet.name", "pet_name")
+compiled = query.compile()
+```
+
+This narrows the highlighted region; it does not eliminate errors downstream of
+an invalid call. Use separate variable names when joins or projections change the
+type: repeatedly assigning those results to one variable can fail mypy checking.
+The [diagnostic investigation](adr/0004-diagnostic-recovery.md) records the tested
+alternatives. The playground displays the original checker diagnostics.
+
 ## Optional mypy checks
 
 The existing plugin remains an optional enhancement:

@@ -72,3 +72,39 @@ API. Keep the strict types and visible limitation. Revisit when upstream recover
 changes or a portable scope-mapping design has equivalent safety and editor tests.
 The fixture is an investigation artifact, not a requirement to preserve noisy
 diagnostics forever.
+
+## Follow-up: call structure and diagnostic ranges
+
+`test/typings/diagnostic_layout.txt` compares the actual public client across
+wrong columns, operators, selections, keywords, missing arguments, join tables,
+join columns, and alias sources. It also compares separate intermediate variables,
+bound methods, reassignment, and explicit type annotations. Run it with the same
+commands above, substituting `diagnostic_layout.txt`.
+
+Pyright 1.1.413 results:
+
+| Error or organization | Diagnostic behavior |
+| --- | --- |
+| Invalid `where` column/operator or `select` column | Argument-sized range, query type retained |
+| Missing required argument or wrong keyword in `where` | Call-level diagnostic and unknown-type cascade, even without overloads |
+| Invalid join table/column or alias source | Call-level diagnostic spans the preceding fluent receiver, plus an argument-sized diagnostic |
+| Separate variables before a failing call | Call-level diagnostic stays on that statement; earlier valid stages stay clear, downstream errors remain |
+| Store the bound method before calling it | Also narrows the call range, but does not improve inference; adds unnecessary indirection |
+| Reuse `query = query...` after scope/result changes | Pyright permits it, but mypy rejects the changing inferred variable type even for valid calls |
+| Annotate the local result's exact query type | Does not fully stop Pyright's downstream unknown-type diagnostics |
+| Give a helper function an exact return annotation | Caller retains the declared type; errors stay inside the helper, including the invalid return |
+
+The range problem is broader than overload inference. A fluent call's receiver is
+itself the preceding expression, so a diagnostic attached to the complete call can
+cover every preceding line, including parentheses. Moving a method implementation
+to a base class or wrapper does not change that call-site syntax tree. Narrowing
+these ranges generally would require an upstream checker change, separate from
+recovering a failed call's return type.
+
+Distinct intermediate variables are an honest, portable mitigation when editing a
+large query. They do not alter validation, require casts, or promise that later
+errors disappear. Keep fluent examples supported; do not silently rewrite the
+playground input to hide the limitation. Return-annotated helpers are appropriate
+at real application boundaries, not a reason to require verbose query annotations
+everywhere. No checker configuration or public method signature was weakened in
+this follow-up.
