@@ -6,7 +6,6 @@ site_author = "Myles Murphy"
 repo_url = "https://github.com/mylesmmurphy/pysely"
 repo_name = "mylesmmurphy/pysely"
 edit_uri = "edit/main/docs/"
-copyright = "Copyright © 2026 Myles Murphy"
 nav = [
   { "Home" = "index.md" },
   { "Getting started" = "getting-started.md" },
@@ -20,6 +19,9 @@ extra_css = ["assets/playground.css"]
 extra_javascript = [
   "assets/playground.js",
 ]
+
+[project.extra]
+generator = false
 
 [project.theme]
 features = [
