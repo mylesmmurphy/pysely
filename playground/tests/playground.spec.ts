@@ -63,6 +63,12 @@ test("keeps real execution available", async ({ page }) => {
   await expect(page.locator("#playground-sql")).toContainText(
     'select "first_name", "pet"."name" as "pet_name"',
   );
+  const query = await page.evaluate(() => {
+    const monaco = (window as any).monaco;
+    return monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).getValue();
+  });
+  expect(query).toContain("results = await query.execute()");
+  expect(query).toContain('result["pet_name"]');
 });
 
 test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {

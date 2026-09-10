@@ -65,6 +65,21 @@ The [diagnostic investigation](adr/0004-diagnostic-recovery.md) records the test
 alternatives. Fluent chaining is the intended API. The playground displays the
 original checker diagnostics and does not add execution errors as editor markers.
 
+For a temporarily tighter diagnostic range, the same builder can be written as
+separate calls while locating an error:
+
+```python
+query = db.select_from("person")
+joined = query.inner_join("pet", "owner_id", "person.id")
+filtered = joined.where("first_name", "=", "Jennifer")
+selected = filtered.select("first_name")
+result = selected.select_as("pet.name", "pet_name")
+```
+
+Each variable keeps a distinct name because joins and projections change the
+query's static type. Fluent chaining remains the normal Pysely style; this form is
+only useful when a checker attaches a call-level error to a larger chain.
+
 ## Optional mypy checks
 
 The existing plugin remains an optional enhancement:

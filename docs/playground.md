@@ -28,7 +28,9 @@ hide:
   <pre id="playground-error" role="alert" hidden></pre>
 </div>
 
-Queries compile in your browser; no database connection is required. Editor
-suggestions, type information, and diagnostics come from upstream Pyright running
-locally in a browser worker. The [typing guide](typing.md) explains the generated
-types shared with standard Python editors.
+Run compiles queries in your browser with the selected dialect; no database
+connection is required. The `show_results` example is type checked to demonstrate
+the execution result and is not invoked by the playground. Editor suggestions,
+type information, and diagnostics come from upstream Pyright running locally in a
+browser worker. The [typing guide](typing.md) explains the generated types shared
+with standard Python editors.

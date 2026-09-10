@@ -3,7 +3,8 @@ import sys
 import traceback
 import types
 
-from pysely import MysqlDialect, PostgresDialect, SqliteDialect
+from pysely import Dialect
+from pysely.query_compiler import BindingProfile
 
 SQL_CLAUSES = (
     "delete from",
@@ -88,8 +89,15 @@ def format_sql(sql):
     return "\n".join(lines)
 
 
-async def unavailable_database():
-    raise RuntimeError("The playground compiles queries without a database")
+PROFILES = {
+    "postgres": BindingProfile("postgres-asyncpg", "${position}"),
+    "mysql": BindingProfile("mysql-asyncmy", "%s", "`", "`", None),
+    "sqlite": BindingProfile("sqlite-aiosqlite", "?"),
+}
+
+
+def compilation_dialect(name):
+    return Dialect(PROFILES[name])
 
 
 def evaluate_playground(schema_code, database_code, query_code, dialect_name):
@@ -100,12 +108,7 @@ def evaluate_playground(schema_code, database_code, query_code, dialect_name):
         database = types.ModuleType("database")
         sys.modules["database"] = database
         exec(compile(database_code, "database.py", "exec"), database.__dict__)
-        dialects = {
-            "postgres": PostgresDialect(pool=unavailable_database),
-            "mysql": MysqlDialect(pool=unavailable_database),
-            "sqlite": SqliteDialect(database=unavailable_database),
-        }
-        namespace = {"dialect": dialects[dialect_name]}
+        namespace = {"dialect": compilation_dialect(dialect_name)}
         exec(compile(query_code, "query.py", "exec"), namespace)
         compiled = namespace["compiled"]
         return json.dumps(

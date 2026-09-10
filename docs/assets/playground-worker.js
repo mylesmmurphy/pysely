@@ -6,7 +6,7 @@ async function initialize() {
   const wheel = new URL("../wheels/pysely-0.1.0.dev0-py3-none-any.whl", self.location).href;
   await python.runPythonAsync(`import micropip\nawait micropip.install(${JSON.stringify(wheel)}, deps=False)`);
   const [bridge, database] = await Promise.all([
-    fetch(new URL("playground.py", self.location)),
+    fetch(new URL("playground.py?build=3", self.location)),
     fetch(new URL("examples/database.py", self.location)),
   ]);
   if (!bridge.ok || !database.ok) throw new Error("Could not load playground support");

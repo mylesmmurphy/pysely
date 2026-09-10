@@ -19,3 +19,10 @@ query = (
 )
 
 compiled = query.compile()
+
+
+async def show_results() -> None:
+    results = await query.execute()
+    for result in results:
+        pet_name: str = result["pet_name"]
+        print(pet_name)
