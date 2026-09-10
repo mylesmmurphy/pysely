@@ -1,3 +1,4 @@
+.pysely-home-link { color: inherit; }
 body:has(#playground) .md-grid { max-width: 100%; }
 body:has(#playground) .md-content { min-width: 0; }
 .pysely-playground { border: 1px solid var(--md-default-fg-color--lightest); border-radius: 8px; overflow: hidden; }
