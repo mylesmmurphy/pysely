@@ -150,6 +150,14 @@ test("labels playground navigation as an interactive editor", async ({ page }) =
   await expect(link).toHaveClass(/md-button--primary/);
 });
 
+test("serves content-hashed documentation assets", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator('link[href*="/assets/site."]')).toHaveAttribute("href", /site\.[a-f0-9]{12}\.css$/);
+  await expect(page.locator('link[href*="/assets/playground."]')).toHaveAttribute("href", /playground\.[a-f0-9]{12}\.css$/);
+  await expect(page.locator('script[src*="/assets/site."]')).toHaveAttribute("src", /site\.[a-f0-9]{12}\.js$/);
+  await expect(page.locator('script[src*="/assets/playground."]')).toHaveAttribute("src", /playground\.[a-f0-9]{12}\.js$/);
+});
+
 test("separates playground at the bottom of the docs navigation", async ({ page }) => {
   await page.goto("/queries/");
   const items = page.locator('.md-nav--primary > .md-nav__list > .md-nav__item');

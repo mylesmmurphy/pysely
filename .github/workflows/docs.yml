@@ -50,6 +50,7 @@ jobs:
       - run: npm run build --prefix playground
       - run: uv build --wheel --out-dir docs/wheels
       - run: uv run --no-sync zensical build --clean
+      - run: python scripts/fingerprint_docs_assets.py
       - run: npx playwright install --with-deps chromium firefox webkit
         working-directory: playground
       - run: npm run test:e2e --prefix playground

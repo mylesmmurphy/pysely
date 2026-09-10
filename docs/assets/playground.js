@@ -1,5 +1,12 @@
 (() => {
-  const assets = new URL(".", document.currentScript.src);
+  const scriptUrl = new URL(document.currentScript.src);
+  const assets = new URL(".", scriptUrl);
+  const revision = scriptUrl.pathname.match(/playground\.([^.]+)\.js$/)?.[1] || "dev";
+  const assetUrl = path => {
+    const url = new URL(path, assets);
+    url.searchParams.set("v", revision);
+    return url;
+  };
   const monacoBase = "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs";
   let loading;
   let mountVersion = 0;
@@ -136,8 +143,8 @@
     retry.hidden = true;
     try {
       const [manifestResponse, typeshedResponse] = await Promise.all([
-        fetch(new URL("intelligence/manifest.json?build=9", assets)),
-        fetch(new URL("intelligence/typeshed-fallback.zip", assets)),
+        fetch(assetUrl("intelligence/manifest.json")),
+        fetch(assetUrl("intelligence/typeshed-fallback.zip")),
       ]);
       if (!manifestResponse.ok || !typeshedResponse.ok) throw new Error("Could not load Pyright assets");
       const manifest = await manifestResponse.json();
@@ -147,7 +154,7 @@
         "workspace/schema.py": models[0].getValue(),
         "workspace/query.py": models[1].getValue(),
       };
-      worker = new Worker(new URL("intelligence/pyright-worker.js", assets));
+      worker = new Worker(assetUrl("intelligence/pyright-worker.js"));
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Pyright startup timed out")), 20000);
         const onMessage = event => {
@@ -302,7 +309,7 @@
     const error = root.querySelector("#playground-error");
     try {
       const [, schemaResponse, queryResponse] = await Promise.all([
-        loadEditor(), fetch(new URL("examples/schema.py?build=7", assets)), fetch(new URL("examples/query.py?build=9", assets)),
+        loadEditor(), fetch(assetUrl("examples/schema.py")), fetch(assetUrl("examples/query.py")),
       ]);
       if (!root.isConnected || version !== mountVersion) return;
       if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");
@@ -363,7 +370,7 @@
         status.setAttribute("aria-busy", "true");
         error.hidden = true;
         if (!worker) {
-          worker = new Worker(new URL("playground-worker.js?build=5", assets), { type: "module" });
+          worker = new Worker(assetUrl("playground-worker.js"), { type: "module" });
           worker.onmessage = ({ data }) => {
             if (data.id !== id) return;
             busy = false;

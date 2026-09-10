@@ -1,13 +1,20 @@
 let runtime;
+const revision = new URL(self.location).searchParams.get("v") || "dev";
+const assetUrl = path => {
+  const url = new URL(path, self.location);
+  url.searchParams.set("v", revision);
+  return url;
+};
+
 async function initialize() {
   const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs");
   const python = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.6/full/" });
   await python.loadPackage("micropip");
-  const wheel = new URL("../wheels/pysely-0.1.0.dev0-py3-none-any.whl", self.location).href;
+  const wheel = assetUrl("../wheels/pysely-0.1.0.dev0-py3-none-any.whl").href;
   await python.runPythonAsync(`import micropip\nawait micropip.install(${JSON.stringify(wheel)}, deps=False)`);
   const [bridge, database] = await Promise.all([
-    fetch(new URL("playground.py?build=4", self.location)),
-    fetch(new URL("examples/database.py?build=1", self.location)),
+    fetch(assetUrl("playground.py")),
+    fetch(assetUrl("examples/database.py")),
   ]);
   if (!bridge.ok || !database.ok) throw new Error("Could not load playground support");
   await python.runPythonAsync(await bridge.text());

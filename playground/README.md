@@ -26,11 +26,14 @@ npm ci --ignore-scripts --prefix playground
 npm run build --prefix playground
 uv build --wheel --out-dir docs/wheels
 uv run --no-sync zensical build --clean
+python scripts/fingerprint_docs_assets.py
 ```
 
 `scripts/build-assets.mjs` packages the pinned Pyright typeshed and the real
 `src/pysely` Python sources. The generated manifest records the checker version,
 source revision, Python targets, schema hash, and typeshed size/hash.
+`scripts/fingerprint_docs_assets.py` gives browser assets content-hashed names in
+the generated site so each deployment invalidates changed files automatically.
 The install skips the pinned Pyright repository's monorepo bootstrap; all packages
 used by the browser worker are declared directly in `package.json`.
 

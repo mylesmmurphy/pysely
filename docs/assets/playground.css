@@ -1,4 +1,9 @@
 .pysely-home-link { color: inherit; }
+body:has(.pysely-playground) .md-main__inner { margin-top: 12px; }
+body:has(.pysely-playground) .md-content__inner { padding-top: 0; }
+body:has(.pysely-playground) .md-content__inner::before { height: 0; }
+body:has(.pysely-playground) .md-content__button,
+body:has(.pysely-playground) .md-typeset > h1#__skip { display: none; }
 body:has(.pysely-playground) .md-grid { max-width: 100%; }
 body:has(.pysely-playground) .md-content { min-width: 0; }
 .pysely-playground { border: 1px solid var(--md-default-fg-color--lightest); border-radius: 8px; overflow: hidden; }
