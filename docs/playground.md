@@ -4,10 +4,6 @@ hide:
   - toc
 ---
 
-# Playground
-
-Define your database, write a query, and inspect the SQL produced by Pysely.
-
 <div id="playground-workbench" class="pysely-playground">
   <div class="pysely-playground__toolbar">
     <label for="playground-dialect">Dialect</label>

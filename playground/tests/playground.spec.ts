@@ -53,6 +53,10 @@ async def inspect() -> None:
 
 test("keeps real execution available", async ({ page }) => {
   await page.goto("/playground/");
+  await expect(page.locator("main h1")).not.toBeVisible();
+  const header = await page.locator(".md-header").boundingBox();
+  const playground = await page.locator("#playground-workbench").boundingBox();
+  expect(playground!.y - (header!.y + header!.height)).toBeLessThan(8);
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
   await expect(page.locator("#playground-sql")).toContainText(
     'select "first_name", "pet"."name" as "pet_name"',
