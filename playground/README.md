@@ -4,6 +4,21 @@ The documentation playground runs Pyright 1.1.413 in a browser worker. Monaco
 sends normal LSP requests to that worker; a separate Pyodide worker executes the
 same example against the real Pysely package.
 
+## Editor parity requirement
+
+The playground must represent the Python editing experience users get in VS Code.
+Use the same public schema types and stock language-server results. Do not mock
+completions, rewrite diagnostic messages or ranges, group or hide cascading errors,
+or add browser-only typing improvements. Investigate improvements in the Python
+types or upstream checker and verify them with the stock local language server.
+Preserve limitations when no sound portable fix exists. Runtime exceptions belong
+in the execution output, not additional editor type-checking markers.
+
+Match checker versions and settings when comparing behavior: Pylance versions and
+user settings can differ from the pinned browser Pyright. Browser UI chrome is not
+expected to duplicate VS Code, but language intelligence must not promise a better
+experience than the public types provide there.
+
 Build the generated assets from the repository root:
 
 ```console

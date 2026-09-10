@@ -1,5 +1,11 @@
 # Implementation roadmap
 
+Editor parity is a requirement: the playground must use the public Python types
+and unmodified stock language-server results, matching VS Code with equivalent
+settings. Improvements belong in the typing contract or upstream checker. Track
+failed-overload recovery using the [diagnostic investigation](adr/0004-diagnostic-recovery.md);
+do not conceal its limitations in the browser.
+
 ## Stage 1: Foundations
 
 - Package, CI, parity ledger, and decision records.

@@ -16,6 +16,10 @@ Arbitrary projection aliases and some column-to-value relationships remain beyon
 the current portable contract. The optional `pysely.mypy` plugin may provide
 stronger checks, but it is not a runtime dependency or a baseline release gate.
 
-The docs playground runs real Python and Pysely compilation but does not simulate
-language-server results. Browser-hosted Pyright can be reconsidered when a current,
-maintained build can be loaded without degrading startup.
+The docs playground runs real Python compilation and stock browser-hosted Pyright.
+Its language intelligence must represent VS Code using the same public types and
+equivalent checker settings. Do not mock completions or rewrite, group, or suppress
+diagnostics for a browser-only improvement. Improve the Python typing contract or
+upstream checker instead; retain honest limitations where portable typing cannot
+resolve them. See the [diagnostic investigation](0004-diagnostic-recovery.md) and
+the contributor contract in `playground/README.md`.

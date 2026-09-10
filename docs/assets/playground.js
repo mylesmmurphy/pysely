@@ -126,13 +126,13 @@
   const markdown = value => typeof value === "string" ? value : value?.value || "";
 
   async function startIntelligence(monaco, models, status, retry) {
-    const { groupDiagnostics } = await import(new URL("playground-diagnostics.mjs", assets));
     const startedAt = performance.now();
     let client;
     let worker;
     const disposables = [];
     const readonlyModels = [];
-    status.textContent = "Loading Python suggestions…";
+    status.textContent = "Loading Python suggestions";
+    status.setAttribute("aria-busy", "true");
     retry.hidden = true;
     try {
       const [manifestResponse, typeshedResponse] = await Promise.all([
@@ -169,11 +169,11 @@
       client.diagnostics = params => {
         const model = monaco.editor.getModel(monaco.Uri.parse(params.uri));
         if (!model || (params.version && params.version < model.getVersionId())) return;
-        monaco.editor.setModelMarkers(model, "pyright", groupDiagnostics(params.diagnostics, params.uri).map(item => ({
+        monaco.editor.setModelMarkers(model, "pyright", params.diagnostics.map(item => ({
           ...lspRange(item.range), message: item.message, code: item.code,
           severity: [0, monaco.MarkerSeverity.Error, monaco.MarkerSeverity.Warning, monaco.MarkerSeverity.Info, monaco.MarkerSeverity.Hint][item.severity || 4],
           tags: item.tags,
-          relatedInformation: item.relatedInformation.map(info => ({
+          relatedInformation: item.relatedInformation?.map(info => ({
             resource: monaco.Uri.parse(info.location.uri),
             ...lspRange(info.location.range), message: info.message,
           })),
@@ -252,6 +252,7 @@
       }));
       models.slice(0, 2).forEach(model => disposables.push(model.onDidChangeContent(() => client.change(model))));
       status.textContent = `Python suggestions ready · Pyright ${manifest.pyrightVersion}`;
+      status.setAttribute("aria-busy", "false");
       status.dataset.startupMs = String(Math.round(performance.now() - startedAt));
       return () => {
         models.slice(0, 2).forEach(model => client.close(model));
@@ -264,6 +265,7 @@
       if (!client) worker?.terminate();
       disposables.forEach(item => item.dispose());
       status.textContent = `Python suggestions unavailable · ${failure.message || failure}`;
+      status.setAttribute("aria-busy", "false");
       retry.hidden = false;
       throw failure;
     }
@@ -320,7 +322,7 @@
       const models = [
         monaco.editor.createModel(examples[0], "python", monaco.Uri.parse("file:///workspace/schema.py")),
         monaco.editor.createModel(examples[1], "python", monaco.Uri.parse("file:///workspace/query.py")),
-        monaco.editor.createModel("-- Loading Python…", "sql"),
+        monaco.editor.createModel("", "sql"),
       ];
       for (const name of ["schema", "query", "sql"]) root.querySelector(`#playground-${name}`).textContent = "";
       const editors = ["schema", "query", "sql"].map((name, index) => monaco.editor.create(
@@ -348,7 +350,8 @@
         busy = true;
         runButton.disabled = true;
         stopButton.disabled = false;
-        status.textContent = worker ? "Compiling…" : "Loading Python…";
+        status.textContent = worker ? "Compiling" : "Loading Python";
+        status.setAttribute("aria-busy", "true");
         error.hidden = true;
         if (!worker) {
           worker = new Worker(new URL("playground-worker.js?build=2", assets), { type: "module" });
@@ -357,7 +360,7 @@
             busy = false;
             runButton.disabled = false;
             stopButton.disabled = true;
-            for (const model of models) monaco.editor.setModelMarkers(model, "pysely", []);
+            status.setAttribute("aria-busy", "false");
             if (data.error) {
               status.textContent = "Check your code";
               error.textContent = data.error;
@@ -376,6 +379,7 @@
           worker.onerror = (event) => {
             stop();
             status.textContent = "Could not start Python";
+            status.setAttribute("aria-busy", "false");
             error.textContent = event.message;
             error.hidden = false;
           };
@@ -391,6 +395,7 @@
         runButton.disabled = false;
         stopButton.disabled = true;
         status.textContent = "Stopped";
+        status.setAttribute("aria-busy", "false");
       }
 
       const subscriptions = models.slice(0, 2).map(model => model.onDidChangeContent(() => {
@@ -416,6 +421,7 @@
       setTimeout(() => loadIntelligence().finally(run), 500);
     } catch (failure) {
       status.textContent = "Could not load playground";
+      status.setAttribute("aria-busy", "false");
       error.textContent = String(failure);
       error.hidden = false;
     }

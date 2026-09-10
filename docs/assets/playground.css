@@ -8,6 +8,13 @@ body:has(.pysely-playground) .md-content { min-width: 0; }
 #playground-run { background: var(--md-primary-fg-color); color: var(--md-primary-bg-color); }
 #playground-intelligence-status { margin-left: auto; font-size: 13px; }
 #playground-status { font-size: 13px; }
+.pysely-playground [aria-busy="true"]::before,
+.pysely-editor__loading::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -2px; animation: pysely-spin .8s linear infinite; }
+@keyframes pysely-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .pysely-playground [aria-busy="true"]::before,
+  .pysely-editor__loading::before { animation: none; }
+}
 .pysely-playground__panes { display: grid; grid-template-columns: 1fr 1.3fr 1fr; }
 .pysely-playground__panes section { min-width: 0; border-top: 1px solid var(--md-default-fg-color--lightest); }
 .pysely-playground__panes section + section { border-left: 1px solid var(--md-default-fg-color--lightest); }

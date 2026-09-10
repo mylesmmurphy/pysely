@@ -56,14 +56,16 @@ test("keeps real execution available", async ({ page }) => {
   await expect(page.locator("main h1")).not.toBeVisible();
   const header = await page.locator(".md-header").boundingBox();
   const playground = await page.locator("#playground-workbench").boundingBox();
-  expect(playground!.y - (header!.y + header!.height)).toBeLessThan(8);
+  const gap = playground!.y - (header!.y + header!.height);
+  expect(gap).toBeGreaterThanOrEqual(8);
+  expect(gap).toBeLessThanOrEqual(20);
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
   await expect(page.locator("#playground-sql")).toContainText(
     'select "first_name", "pet"."name" as "pet_name"',
   );
 });
 
-test("highlights a bad argument without underlining the query chain", async ({ page }) => {
+test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
   await page.evaluate(code => {
@@ -85,6 +87,7 @@ test("highlights a bad argument without underlining the query chain", async ({ p
     expect.objectContaining({ code: "reportArgumentType" }),
   ]));
   const result = await markers();
-  expect(result.every((item: any) => item.start === item.end)).toBe(true);
-  expect(result.some((item: any) => item.code === "reportUnknownMemberType" || item.owner === "pysely")).toBe(false);
+  expect(result.some((item: any) => item.code === "reportCallIssue")).toBe(true);
+  expect(result.some((item: any) => item.code === "reportUnknownMemberType")).toBe(true);
+  expect(result.some((item: any) => item.owner === "pysely")).toBe(false);
 });
