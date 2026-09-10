@@ -2,13 +2,20 @@
 
 Status: accepted
 
-Runtime catalog generics expose precise column read, insert, and update types without
-a checker plugin. Arbitrary projection shapes remain conservative in portable typing.
-The optional `pysely.mypy` plugin adds scope and named-projection inference for
-literal string read queries without becoming a runtime dependency. Annotated
-table classes and a database registry supply schema information; normal string
-reads do not require catalog objects or `.c` access.
+Generated schema-specific clients are the default typing architecture. They use
+ordinary `Literal` types, overloads, and generic query scope so standard Python
+language servers can complete tables and currently available columns without a
+Pysely editor extension.
 
-Mypy hooks do not provide completion support to Pylance. The Monaco playground
-uses a schema-aware completion provider. External editor completion integration
-is a separate remaining requirement.
+The reusable runtime remains schema-independent. Generated clients wrap it and do
+not duplicate SQL construction or execution. Strict generated entry points avoid a
+blanket `str` overload because that would accept misspellings and suppress useful
+literal completion.
+
+Arbitrary projection aliases and some column-to-value relationships remain beyond
+the current portable contract. The optional `pysely.mypy` plugin may provide
+stronger checks, but it is not a runtime dependency or a baseline release gate.
+
+The docs playground runs real Python and Pysely compilation but does not simulate
+language-server results. Browser-hosted Pyright can be reconsidered when a current,
+maintained build can be loaded without degrading startup.

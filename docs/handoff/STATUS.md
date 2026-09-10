@@ -30,14 +30,17 @@ Current stage: 3 - SQL surface
 - Parenthesized boolean groups and basic column-reference comparisons.
 - Annotated database schemas, string read queries, inner joins, and aliases.
 - Optional mypy plugin with scope validation and selected-row TypedDict inference.
+- Portable generated-query wrapper and schema-specific fixture using standard
+  literals, overloads, and join-scope accumulation.
 - Schema-backed string inserts, updates, deletes, predicates, and returning fields.
-- Monaco schema/query/SQL editors, schema-aware completion, and interruptible
-  browser compilation in a worker.
+- Monaco schema/query/SQL editors and interruptible browser compilation in a worker.
+- Real Pyright language-server completion tests for table names and before/after
+  inner-join column scope.
 
 ## Implemented but unverified
 
-- Exact delete-returning inference and external editor completion remain
-  unimplemented.
+- Exact delete-returning inference and production schema generation remain
+  unimplemented. PyCharm behavior is not yet verified.
 
 ## Remaining parity gaps
 
@@ -51,7 +54,7 @@ Current stage: 3 - SQL surface
 
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- Local `pytest -q`: 52 passed and 2 service-dependent skips; live SQLite ran.
+- Local `pytest -q`: 55 passed and 2 service-dependent skips; live SQLite ran.
 - PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
 - GitHub Actions run `34409360952`: PostgreSQL, MySQL, and all core matrix jobs passed.
 - `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
@@ -59,6 +62,7 @@ Current stage: 3 - SQL surface
 - `uv run mypy src/pysely test/fixtures/generated.py`: passed.
 - `uv run mypy --strict test/typings/portable.py`: passed.
 - `uv run pyright src/pysely test/typings/portable.py`: passed.
+- Pyright 1.1.413 language-server completion tests: passed.
 - `uv run python scripts/check_parity.py`: passed.
 - `uv build --no-sources`: wheel and source distribution built successfully.
 - Clean virtual environment wheel install and import: passed.
@@ -72,4 +76,5 @@ Current stage: 3 - SQL surface
 
 1. Add ordering, limits, outer joins, and the remaining core query surface.
 2. Add schema builders, migrations, introspection, and generated schema classes.
-3. Keep external editor completion, MSSQL, and PGlite runtime work deferred.
+3. Generate schema-specific clients and extend standard-editor verification.
+4. Keep custom editor tooling, MSSQL, and PGlite runtime work deferred.

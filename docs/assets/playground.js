@@ -69,7 +69,6 @@
       const runButton = root.querySelector("#playground-run");
       const stopButton = root.querySelector("#playground-stop");
       const dialect = root.querySelector("#playground-dialect");
-      let tables = {};
       let worker;
       let id = 0;
       let timer;
@@ -91,7 +90,6 @@
             busy = false;
             runButton.disabled = false;
             stopButton.disabled = true;
-            tables = data.tables || {};
             for (const model of models) monaco.editor.setModelMarkers(model, "pysely", []);
             if (data.error) {
               status.textContent = "Check your code";
@@ -132,42 +130,6 @@
         status.textContent = "Stopped";
       }
 
-      const completion = monaco.languages.registerCompletionItemProvider("python", {
-        triggerCharacters: ['"', "'", "."],
-        provideCompletionItems(model, position) {
-          if (model !== models[1]) return { suggestions: [] };
-          const before = model.getValueInRange({ startLineNumber: 1, startColumn: 1, endLineNumber: position.lineNumber, endColumn: position.column });
-          const current = before.match(/(?:select_from|inner_join|where|select)\([^\n]*$/)?.[0] || "";
-          const quoted = current.match(/["']([^"']*)$/);
-          const word = model.getWordUntilPosition(position);
-          let entries = [];
-          if (quoted) {
-            if (current.startsWith("where(") && /["'][^"']*["']\s*,/.test(current)) return { suggestions: [] };
-            const tableArgument = /^(select_from|inner_join)\(\s*["'][^"']*$/.test(current);
-            if (tableArgument) entries = Object.keys(tables).map(name => [name, "table"]);
-            else {
-              const scope = {};
-              for (const match of before.matchAll(/\.(select_from|inner_join)\(\s*["']([^"']+)["']/g)) {
-                if (match[1] === "select_from") for (const key of Object.keys(scope)) delete scope[key];
-                const [name, alias = name] = match[2].split(" as ");
-                if (tables[name]) scope[alias] = tables[name];
-              }
-              const counts = {};
-              for (const columns of Object.values(scope)) for (const name of Object.keys(columns)) counts[name] = (counts[name] || 0) + 1;
-              for (const [alias, columns] of Object.entries(scope)) for (const [name, type] of Object.entries(columns)) {
-                entries.push([`${alias}.${name}`, type]);
-                if (counts[name] === 1) entries.push([name, type]);
-              }
-            }
-          } else if (/\.\w*$/.test(before)) {
-            entries = ["select_from", "inner_join", "where", "select", "compile", "execute", "execute_take_first", "execute_take_first_or_throw"].map(name => [name, "Pysely method"]);
-          }
-          const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
-            startColumn: quoted ? position.column - quoted[1].length : word.startColumn, endColumn: position.column };
-          return { suggestions: entries.map(([name, detail]) => ({ label: name, insertText: name, detail, range,
-            kind: quoted ? monaco.languages.CompletionItemKind.Field : monaco.languages.CompletionItemKind.Method })) };
-        },
-      });
       const subscriptions = models.slice(0, 2).map(model => model.onDidChangeContent(() => {
         clearTimeout(timer);
         timer = setTimeout(run, 600);
@@ -177,7 +139,7 @@
       dialect.onchange = run;
       root.querySelector("#playground-reset").onclick = () => { stop(); models[0].setValue(examples[0]); models[1].setValue(examples[1]); run(); };
       editors[1].addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
-      cleanup = () => { stop(); observer.disconnect(); completion.dispose(); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      cleanup = () => { stop(); observer.disconnect(); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
       requestAnimationFrame(() => requestAnimationFrame(run));
     } catch (failure) {
       status.textContent = "Could not load playground";

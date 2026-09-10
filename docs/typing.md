@@ -1,7 +1,10 @@
 # Schema and typing
 
-Use one annotated class per table and one class mapping database table names to
-those classes. No constructors or `Column` objects are needed for string queries.
+Pysely's baseline typing target is ordinary Python tooling: generated schema
+interfaces, standard annotations, and no required checker plugin. VS Code with
+Pylance is the primary target; PyCharm remains unverified.
+
+The current runtime schema remains simple:
 
 ```python
 class PersonTable:
@@ -17,31 +20,44 @@ db = Pysely(schema=Database, dialect=PostgresDialect(pool=pool))
 rows = await db.select_from("person").select(["id", "first_name"]).execute()
 ```
 
-The database class supplies runtime schema information and the generic database
-type. Schema information is preserved in transactions and connection scopes.
-`TypedDict` table definitions are also supported.
+This form validates names at runtime. Until schema code generation ships, its
+portable result type remains the conservative `dict[str, object]`.
 
-## Mypy
+## Generated interfaces
 
-Enable the optional plugin in your project's `pyproject.toml`:
+The generated client design now uses `Literal` names, overloads, and generic query
+scope. A permanent fixture verifies that standard Pyright can suggest tables,
+suggest only columns currently in scope, add columns after a join, and reject
+out-of-scope names. The same query still executes through the normal Pysely runtime.
+
+Database introspection and the `pysely codegen` command are not implemented yet.
+They are the next step needed to make this generated interface the normal workflow.
+
+| Capability | Portable status |
+| --- | --- |
+| Table-name completion | Verified with Pyright language server 1.1.413 |
+| Columns before and after inner joins | Verified with Pyright language server 1.1.413 |
+| Invalid and unjoined columns | Verified with Pyright 1.1.413 |
+| Runtime schema validation | Verified |
+| Column-specific comparison values | Limited to the optional mypy plugin |
+| Typed string writes | Planned for generated interfaces |
+| Exact narrow projection results | Limited to the optional mypy plugin |
+| Aliases and outer-join nullability | Not yet implemented |
+| PyCharm behavior | Unverified |
+
+## Optional mypy checks
+
+The existing plugin remains an optional enhancement:
 
 ```toml
 [tool.mypy]
 plugins = ["pysely.mypy"]
 ```
 
-For literal string queries the plugin checks table and column names, tracks inner
-joins and table aliases, validates comparison values and write keys, and infers a
-`TypedDict` result containing selected fields and insert/update returning fields.
-Without the plugin, results use the conservative `dict[str, object]` type.
+It checks literal table and column names, comparison values, write keys, and some
+projected result shapes. It is not required by Pysely at runtime and is no longer
+the foundation of the default typing design.
 
-The plugin adds mypy diagnostics and inference. It does not install completion
-support into Pylance or other Python language servers. The playground provides its
-own schema-aware table and column suggestions through Monaco.
-
-External-editor completion is deferred until the core query, schema, migration,
-and code-generation surfaces are stable. See the [roadmap](ROADMAP.md).
-
-The initial string query surface covers reads, inner joins, predicates,
-projections, inserts, updates, deletes, and returning projections. The earlier
-object-based builders remain available for compatibility.
+The browser [playground](playground.md) runs the real Pysely package for query
+compilation. It does not invent completion results that a standard editor may not
+provide.

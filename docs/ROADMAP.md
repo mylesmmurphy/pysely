@@ -24,7 +24,8 @@ MySQL, and SQLite.
 - Add Kysely-style schema builders for creating, altering, and dropping tables,
   columns, indexes, constraints, and schemas where the dialect supports them.
 - Capability checks and dialect helpers.
-- Enhanced mypy inference for scope, projection, aliases, and null-extending joins.
+- Generated schema-specific clients using standard literals, overloads, and generic
+  scope, with optional enhanced mypy inference kept separate.
 
 Exit: every applicable upstream behavior has runtime, compiler, and typing evidence.
 
@@ -53,17 +54,18 @@ rolled back against a real database.
 
 Exit: all release acceptance criteria in the architecture handoff are evidenced.
 
-## Deferred editor integration
+## Standard editor verification
 
-- Build external-editor completion on shared schema/query analysis without changing
-  the public query API.
-- Add VS Code extension-host end-to-end tests for string completion, invalid table
-  and column diagnostics, comparison value types, and inferred result types.
-- Keep the completion protocol editor-neutral so other editors can integrate with
-  the same analysis after the VS Code/Pylance path is proven.
+- Generate interfaces that work with Pylance, Pyright, and ordinary mypy without a
+  plugin or background watcher.
+- Expand language-server tests for invalid tables, ambiguity, values, writes,
+  projections, aliases, nullable joins, helpers, and multiple generated schemas.
+- Verify representative behavior in VS Code/Pylance and PyCharm separately.
+- Keep custom LSP and editor-extension work paused unless measured portable gaps
+  justify it after the core API and code generator stabilize.
 
-This work remains deferred until the core query, schema, migration, and codegen
-surfaces are stable.
+Browser playground completions must come from a real language service; simulated
+completion providers are not part of the product.
 
 ## Post-readiness dialect expansion
 

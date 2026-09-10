@@ -68,6 +68,6 @@ packages = ["pysely"]
 mypy_path = "src"
 
 [tool.pyright]
-include = ["src", "test/typings"]
+include = ["src", "test/typings", "test/fixtures/portable_schema.py"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"

@@ -6,8 +6,9 @@ Pysely is under active development and is not production-ready.
 
 - Immutable query nodes and builders
 - Annotated database schemas and string-based reads and writes
-- Mypy plugin for literal string queries, scope checks, and projected rows
-- Three-pane Monaco playground with schema-aware table and column completion
+- Optional mypy plugin for literal string queries, scope checks, and projected rows
+- Portable generated-client foundation with real Pyright language-server tests
+- Three-pane Monaco playground running Pysely in browser Python
 - PostgreSQL, MySQL, and SQLite compilation and async execution
 - Select, insert, update, and delete
 - Bound predicates, aliases, returning projections, and result metadata
@@ -18,10 +19,11 @@ Pysely is under active development and is not production-ready.
 ## In progress
 
 - Ordering, limits, additional joins, and the broader Kysely SQL surface
-- Stronger projected-row inference
+- Schema-specific interface generation for standard Python editors
+- Comparison, write, projection, alias, and nullability typing on generated clients
 - Failure-path, cancellation, and lifecycle hardening
 - Schema builders, migrations, introspection, generation, and streaming
-- External-editor completion after the database API is stable
+- Browser language-server integration without simulated completion behavior
 
 MSSQL and PGlite runtime adapters are post-readiness work.
 

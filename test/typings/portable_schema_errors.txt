@@ -1,0 +1,11 @@
+from test.fixtures.dialects import postgres_dialect
+from test.fixtures.portable_schema import Database
+
+db = Database(dialect=postgres_dialect())
+person = db.select_from("person")
+
+person.where("species", "=", "dog")
+person.select("pet.name")
+
+joined = person.inner_join("pet", "person.id", "pet.owner_id")
+joined.where("missing", "=", 1)

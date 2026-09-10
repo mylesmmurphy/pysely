@@ -20,8 +20,7 @@ currently a pre-alpha development release.
 ## Define your database
 
 Use one annotated class per table and a database class mapping table names to
-those types. The same definitions drive runtime column validation and the mypy
-plugin's scope and result inference.
+those types. These definitions drive runtime column validation.
 
 ```python
 class UserTable:
@@ -54,5 +53,6 @@ async with Pysely(schema=Database, dialect=SqliteDialect(database=database)) as 
 
 All values are passed separately from the generated SQL as driver parameters.
 
-Enable [the mypy plugin](typing.md) for string-reference checks and selected-row
-inference. Try the same API with editor suggestions in the [playground](playground.md).
+The [typing guide](typing.md) describes the standard-editor generated interface
+now under development and the optional mypy checks available today. Try query
+compilation in the [playground](playground.md).

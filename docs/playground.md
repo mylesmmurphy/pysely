@@ -6,8 +6,7 @@ hide:
 
 # Playground
 
-Define your database, write a query, and inspect the SQL. Table and column
-suggestions update from your schema. Press **Ctrl+Space** inside a string to explore.
+Define your database, write a query, and inspect the SQL produced by Pysely.
 
 <div id="playground-workbench" class="pysely-playground">
   <div class="pysely-playground__toolbar">
@@ -32,5 +31,6 @@ suggestions update from your schema. Press **Ctrl+Space** inside a string to exp
 </div>
 
 Queries compile in your browser; no database connection is required. The editors
-provide Python/SQL highlighting and schema-aware query suggestions. For Python
-project type checking and inferred result fields, enable [the mypy plugin](typing.md).
+provide syntax highlighting but deliberately do not simulate language-server
+completions. The [typing guide](typing.md) tracks the generated types used by
+standard Python editors.

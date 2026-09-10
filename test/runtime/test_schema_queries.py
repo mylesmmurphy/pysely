@@ -6,6 +6,7 @@ import pytest
 from pysely import InvalidQueryError, PostgresDialect, Pysely, SqliteDialect
 from pysely.operation_node import OperationNodeTransformer, OperationNodeVisitor
 from test.fixtures.dialects import _unavailable_database
+from test.fixtures.portable_schema import Database as GeneratedDatabase
 
 
 class PersonTable:
@@ -49,6 +50,23 @@ def test_string_query_compilation_and_scope() -> None:
         query.select("id")
     with pytest.raises(InvalidQueryError, match="Unknown table"):
         db.select_from("missing")
+
+
+def test_generated_query_wrapper_uses_runtime_builder() -> None:
+    db = GeneratedDatabase(dialect=PostgresDialect(pool=_unavailable_database))
+    compiled = (
+        db.select_from("person")
+        .inner_join("pet", "person.id", "pet.owner_id")
+        .where("species", "=", "dog")
+        .select(["first_name", "pet.name"])
+        .compile()
+    )
+    assert compiled.sql == (
+        'select "first_name", "pet"."name" from "person" '
+        'inner join "pet" on "person"."id" = "pet"."owner_id" '
+        'where "species" = $1'
+    )
+    assert compiled.parameters == ("dog",)
 
 
 async def test_string_query_in_transaction_and_connection_scope(tmp_path: Path) -> None:

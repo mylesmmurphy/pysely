@@ -214,15 +214,19 @@ Provide typed library exceptions for invalid query, unsupported feature, no resu
 
 ## 6. Type architecture: two explicitly tested contracts
 
+Direction update: generated schema-specific interfaces and ordinary Python typing
+are the default developer experience. The mypy plugin is optional enhancement,
+not the foundation of the public API. Custom editor services remain paused.
+
 ### 6.1 Portable typing
 
 Ordinary Python types provide generated table/column attributes, expression value types, explicit row/write TypedDicts, generics, overloads, and known full-row results. These must work with both mypy without the plugin and Pyright. Package `py.typed` and test installed-wheel behavior.
 
 Exact arbitrary named projections, scope-sensitive aliases, and outer-join shape transformations are not promised from ordinary annotations alone. Portable fallback results must be conservative, such as `dict[str, object]`, rather than an incorrectly precise `UserRow`. Tuple APIs may use overloads where sound, but must not ignore join-induced nullability. Typed values alone do not prove a column belongs to the current query scope.
 
-### 6.2 Enhanced mypy inference
+### 6.2 Optional enhanced mypy inference
 
-Ship an optional mypy plugin that interprets Pysely's known API and schema metadata, constructs selected-row TypedDict types, and propagates query state. It operates on static declarations and checker AST/type objects, not database connections or execution of application code.
+Preserve an optional mypy plugin that interprets Pysely's known API and schema metadata, constructs selected-row TypedDict types, and propagates query state. It operates on static declarations and checker AST/type objects, not database connections or execution of application code. These capabilities are not baseline release gates when generated standard types provide the documented behavior.
 
 Model internal query type state as conceptually `Query[Database, Scope, Projection, Mode]`. Scope records source identity, alias, accessible columns, correlation rules, and null extension. Projection records output name, value type, source provenance, and conditional presence. These states must survive helper functions, module imports, builder reassignment, and mypy incremental caches. The precise serializable representation is an initial implementation decision to prove with tests.
 
@@ -332,7 +336,10 @@ The metadata manifest supplies complete SQL/default/identity/type information; t
 
 Using `.c` avoids collisions between database column names such as `name`, `schema`, or `alias` and table methods. Sanitize Python keywords and invalid identifiers deterministically while retaining original SQL names; provide explicit-name access for pathological names.
 
-The generated `Database` registry supports static lookup by the mypy plugin and a runtime schema registry passed to the client for string-based queries. It is not a magical built-in mapping type. Define and test the binding between registry annotations, runtime registry instances, and root-client generics.
+Generated schema-specific clients expose literal table overloads and accumulate
+available column-name literals through standard generic types. They wrap the shared
+runtime builder rather than generating SQL behavior. The database registry remains
+the runtime source for string validation.
 
 ### 7.4 Read/write rules and decoding
 
@@ -355,7 +362,9 @@ Generate literal-value write TypedDicts for application inputs; builder `.values
 
 ## 8. Proposed public API examples
 
-The examples use `.c` consistently. Preserve Kysely's string-reference style as a supported path, with stronger validation when a generated registry and mypy plugin are present.
+The preferred API uses Kysely-style string references backed by a generated typed
+client. The earlier `.c` object API remains a compatibility path, not the primary
+developer experience.
 
 ```python
 from app.db.generated import users

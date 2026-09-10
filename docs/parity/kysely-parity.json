@@ -8,9 +8,9 @@
     "dialect_support": {"postgres": true, "mysql": true, "sqlite": true},
     "runtime_status": "verified",
     "mypy_status": "verified",
-    "portable_typing_status": "intentional_difference",
-    "tests": ["test/runtime/test_schema_queries.py", "test/typings/test_schema_plugin.py"],
-    "difference": "Literal read projections are inferred by the optional mypy plugin; other checkers retain dict[str, object]. External editor string completion integration remains separate."
+    "portable_typing_status": "implemented_unverified",
+    "tests": ["test/runtime/test_schema_queries.py", "test/typings/test_schema_plugin.py", "test/typings/test_portable_schema.py"],
+    "difference": "A generated-client fixture verifies standard Pyright table and inner-join scope completion. Production code generation and exact portable projection results remain incomplete."
   },
   {
     "id": "select.explicit_projection.where",

@@ -24,6 +24,7 @@ from .query_builder import (
     InsertQueryBuilder,
     InsertResult,
     SelectQueryBuilder,
+    TypedSchemaQueryBuilder,
     UpdateQueryBuilder,
     UpdateResult,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "SelectQueryBuilder",
     "SqliteDialect",
     "Table",
+    "TypedSchemaQueryBuilder",
     "UnsupportedFeatureError",
     "UpdateQueryBuilder",
     "UpdateResult",

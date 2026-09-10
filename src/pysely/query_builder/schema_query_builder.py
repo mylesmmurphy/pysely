@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Generic, TypeVar, cast
+from typing import Generic, Literal, Self, TypeAlias, TypeVar, cast
 from uuid import uuid4
 
 from pysely.errors import NoResultError
@@ -17,7 +17,11 @@ from pysely.schema import Schema, table_node
 
 DatabaseT = TypeVar("DatabaseT")
 ScopeT = TypeVar("ScopeT")
+ColumnsT = TypeVar("ColumnsT", bound=str)
 RowT = TypeVar("RowT")
+SchemaComparisonOperator: TypeAlias = Literal[
+    "=", "!=", "<>", "<", "<=", ">", ">=", "is", "is not", "like", "not like"
+]
 
 
 @dataclass(frozen=True)
@@ -29,10 +33,8 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
     _query_id: str
 
     @classmethod
-    def from_name(
-        cls, name: str, executor: QueryExecutor, schema: Schema
-    ) -> SchemaQueryBuilder[DatabaseT, object, dict[str, object]]:
-        return SchemaQueryBuilder(
+    def from_name(cls, name: str, executor: QueryExecutor, schema: Schema) -> Self:
+        return cls(
             SelectQueryNode(from_=(table_node(name),)),
             executor,
             schema,
@@ -50,7 +52,7 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         )
 
     def where(
-        self, column: str, operator: str, value: object
+        self, column: str, operator: SchemaComparisonOperator, value: object
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
         predicate = self._schema.predicate(self._scope, column, operator, value)
         where = (
@@ -93,3 +95,34 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         if row is None:
             raise NoResultError("Query returned no rows")
         return row
+
+
+@dataclass(frozen=True)
+class TypedSchemaQueryBuilder(Generic[DatabaseT, ColumnsT, RowT]):
+    _query: SchemaQueryBuilder[DatabaseT, object, RowT]
+
+    def select(
+        self, selections: ColumnsT | list[ColumnsT] | tuple[ColumnsT, ...]
+    ) -> Self:
+        values = cast(str | list[str] | tuple[str, ...], selections)
+        return replace(self, _query=self._query.select(values))
+
+    def where(
+        self, column: ColumnsT, operator: SchemaComparisonOperator, value: object
+    ) -> Self:
+        return replace(self, _query=self._query.where(column, operator, value))
+
+    def _inner_join(self, table: str, left: str, right: str) -> Self:
+        return replace(self, _query=self._query.inner_join(table, left, right))
+
+    def compile(self) -> CompiledQuery[RowT]:
+        return self._query.compile()
+
+    async def execute(self) -> list[RowT]:
+        return await self._query.execute()
+
+    async def execute_take_first(self) -> RowT | None:
+        return await self._query.execute_take_first()
+
+    async def execute_take_first_or_throw(self) -> RowT:
+        return await self._query.execute_take_first_or_throw()

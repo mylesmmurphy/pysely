@@ -2,7 +2,6 @@ import json
 import sys
 import traceback
 import types
-from typing import get_type_hints
 
 from pysely import MysqlDialect, PostgresDialect, SqliteDialect
 
@@ -94,15 +93,10 @@ async def unavailable_database():
 
 
 def evaluate_playground(schema_code, query_code, dialect_name):
-    tables = {}
     try:
         schema = types.ModuleType("schema")
         sys.modules["schema"] = schema
         exec(compile(schema_code, "schema.py", "exec"), schema.__dict__)
-        tables = {
-            name: {column: str(kind) for column, kind in get_type_hints(row).items()}
-            for name, row in get_type_hints(schema.Database).items()
-        }
         dialects = {
             "postgres": PostgresDialect(pool=unavailable_database),
             "mysql": MysqlDialect(pool=unavailable_database),
@@ -113,7 +107,6 @@ def evaluate_playground(schema_code, query_code, dialect_name):
         compiled = namespace["compiled"]
         return json.dumps(
             {
-                "tables": tables,
                 "sql": format_sql(compiled.sql),
                 "parameters": compiled.parameters,
             },
@@ -131,7 +124,6 @@ def evaluate_playground(schema_code, query_code, dialect_name):
         )
         return json.dumps(
             {
-                "tables": tables,
                 "error": str(error),
                 "file": getattr(error, "filename", None)
                 or (frame.filename if frame else "query.py"),
