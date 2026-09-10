@@ -6,7 +6,8 @@ body:has(#playground) .md-content { min-width: 0; }
 .pysely-playground__toolbar button, .pysely-playground__toolbar select { font: inherit; font-size: 14px; padding: 6px 12px; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 4px; cursor: pointer; }
 .pysely-playground__toolbar button:disabled { opacity: .5; cursor: default; }
 #playground-run { background: var(--md-primary-fg-color); color: var(--md-primary-bg-color); }
-#playground-status { margin-left: auto; font-size: 13px; }
+#playground-intelligence-status { margin-left: auto; font-size: 13px; }
+#playground-status { font-size: 13px; }
 .pysely-playground__panes { display: grid; grid-template-columns: 1fr 1.3fr 1fr; }
 .pysely-playground__panes section { min-width: 0; border-top: 1px solid var(--md-default-fg-color--lightest); }
 .pysely-playground__panes section + section { border-left: 1px solid var(--md-default-fg-color--lightest); }

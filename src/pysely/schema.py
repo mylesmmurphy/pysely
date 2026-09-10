@@ -79,6 +79,11 @@ class Schema:
         node = self.reference(scope, name)
         return AliasNode(node, IdentifierNode(alias)) if alias != name else node
 
+    def aliased_selection(
+        self, scope: dict[str, str], source: str, alias: str
+    ) -> AliasNode:
+        return AliasNode(self.reference(scope, source), IdentifierNode(alias))
+
     def predicate(
         self, scope: dict[str, str], column: str, operator: str, value: object
     ) -> OperationNode:

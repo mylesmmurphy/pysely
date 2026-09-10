@@ -14,6 +14,8 @@ dist/
 htmlcov/
 site/
 docs/wheels/
+playground/node_modules/
+playground/test-results/
 .env
 .envrc
 .pypirc

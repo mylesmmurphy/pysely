@@ -6,7 +6,8 @@
 query = (
     db.select_from("person")
     .inner_join("pet", "owner_id", "person.id")
-    .select(["first_name", "pet.name as pet_name"])
+    .select("first_name")
+    .select_as("pet.name", "pet_name")
     .where("species", "=", "dog")
 )
 
@@ -21,6 +22,26 @@ These queries use the schema passed as `schema=Database`; see
 [Schema and typing](typing.md). Ambiguous columns must be qualified with their
 table or alias. The remaining examples below document the earlier object-based
 expression API. String writes use the same database schema and query compiler.
+
+### Portable typed aliases
+
+Use `.select_as(source, alias)` when the result key should be inferred by standard
+Python type checkers:
+
+```python
+row = await (
+    db.select_from("pet")
+    .select_as("pet.name", "pet_name")
+    .execute_take_first_or_throw()
+)
+name = row["pet_name"]
+```
+
+Pysely separates these arguments because Python typing cannot split an arbitrary
+`"pet.name as pet_name"` string into a source type and a new result key. The
+single-string form remains supported at runtime, but exact portable result-key
+inference is not promised for it. Direct literal aliases retain completion and
+value information; dynamic or conflicting aliases use conservative result types.
 
 ## Object-based boolean groups and references
 

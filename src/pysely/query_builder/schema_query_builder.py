@@ -51,6 +51,14 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
             self, _node=replace(self._node, selections=(*self._node.selections, *nodes))
         )
 
+    def select_as(
+        self, source: str, alias: str
+    ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
+        node = self._schema.aliased_selection(self._scope, source, alias)
+        return replace(
+            self, _node=replace(self._node, selections=(*self._node.selections, node))
+        )
+
     def where(
         self, column: str, operator: SchemaComparisonOperator, value: object
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
@@ -106,6 +114,9 @@ class TypedSchemaQueryBuilder(Generic[DatabaseT, ColumnsT, RowT]):
     ) -> Self:
         values = cast(str | list[str] | tuple[str, ...], selections)
         return replace(self, _query=self._query.select(values))
+
+    def _select_as(self, source: ColumnsT, alias: str) -> Self:
+        return replace(self, _query=self._query.select_as(source, alias))
 
     def where(
         self, column: ColumnsT, operator: SchemaComparisonOperator, value: object

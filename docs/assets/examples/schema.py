@@ -10,6 +10,6 @@ class PetTable:
     species: str
 
 
-class Database:
+class DatabaseSchema:
     person: PersonTable
     pet: PetTable

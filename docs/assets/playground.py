@@ -92,11 +92,14 @@ async def unavailable_database():
     raise RuntimeError("The playground compiles queries without a database")
 
 
-def evaluate_playground(schema_code, query_code, dialect_name):
+def evaluate_playground(schema_code, database_code, query_code, dialect_name):
     try:
         schema = types.ModuleType("schema")
         sys.modules["schema"] = schema
         exec(compile(schema_code, "schema.py", "exec"), schema.__dict__)
+        database = types.ModuleType("database")
+        sys.modules["database"] = database
+        exec(compile(database_code, "database.py", "exec"), database.__dict__)
         dialects = {
             "postgres": PostgresDialect(pool=unavailable_database),
             "mysql": MysqlDialect(pool=unavailable_database),

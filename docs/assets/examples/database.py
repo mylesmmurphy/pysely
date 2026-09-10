@@ -11,30 +11,20 @@ from typing import (
     overload,
 )
 
+from schema import DatabaseSchema
+
 from pysely import Pysely, TypedSchemaQueryBuilder
 from pysely.dialect import Dialect
 
-
-class PersonTable:
-    id: int
-    first_name: str
-
-
-class PetTable:
-    id: int
-    owner_id: int
-    name: str
-    species: str
-
-
-class DatabaseSchema:
-    person: PersonTable
-    pet: PetTable
-
-
 PersonColumns: TypeAlias = Literal["person.id", "person.first_name", "first_name"]
 PetColumns: TypeAlias = Literal[
-    "pet.id", "pet.owner_id", "pet.name", "pet.species", "owner_id", "name", "species"
+    "pet.id",
+    "pet.owner_id",
+    "pet.name",
+    "pet.species",
+    "owner_id",
+    "name",
+    "species",
 ]
 TableName: TypeAlias = Literal["person", "pet"]
 AllColumns: TypeAlias = PersonColumns | PetColumns

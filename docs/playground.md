@@ -19,6 +19,8 @@ Define your database, write a query, and inspect the SQL produced by Pysely.
     <button id="playground-run" type="button" disabled>Run</button>
     <button id="playground-stop" type="button" disabled>Stop</button>
     <button id="playground-reset" type="button">Reset example</button>
+    <span id="playground-intelligence-status" role="status">Loading Python suggestions…</span>
+    <button id="playground-intelligence-retry" type="button" hidden>Retry suggestions</button>
     <span id="playground-status" role="status">Loading editors…</span>
   </div>
   <div class="pysely-playground__panes">
@@ -30,7 +32,7 @@ Define your database, write a query, and inspect the SQL produced by Pysely.
   <pre id="playground-error" role="alert" hidden></pre>
 </div>
 
-Queries compile in your browser; no database connection is required. The editors
-provide syntax highlighting but deliberately do not simulate language-server
-completions. The [typing guide](typing.md) tracks the generated types used by
-standard Python editors.
+Queries compile in your browser; no database connection is required. Editor
+suggestions, type information, and diagnostics come from upstream Pyright running
+locally in a browser worker. The [typing guide](typing.md) explains the generated
+types shared with standard Python editors.

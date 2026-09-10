@@ -33,7 +33,8 @@ def test_string_query_compilation_and_scope() -> None:
         base.inner_join("pet", "owner_id", "person.id")
         .where("first_name", "=", "Jennifer")
         .where("species", "=", "dog")
-        .select(["first_name", "pet.name as pet_name"])
+        .select("first_name")
+        .select_as("pet.name", "pet_name")
     )
     compiled = query.compile()
     assert compiled.sql == (
@@ -46,10 +47,27 @@ def test_string_query_compilation_and_scope() -> None:
     OperationNodeVisitor().visit(compiled.query)
     with pytest.raises(InvalidQueryError, match="Unknown column"):
         base.select("pet.name")
+    with pytest.raises(InvalidQueryError, match="Unknown column"):
+        base.select_as("pet.name", "pet_name")
     with pytest.raises(InvalidQueryError, match="Ambiguous column"):
         query.select("id")
     with pytest.raises(InvalidQueryError, match="Unknown table"):
         db.select_from("missing")
+
+
+def test_select_as_quotes_dynamic_and_duplicate_aliases() -> None:
+    db = Pysely(schema=Database, dialect=PostgresDialect(pool=_unavailable_database))
+    alias = 'display "name"'
+    compiled = (
+        db.select_from("person")
+        .select_as("first_name", alias)
+        .select_as("id", alias)
+        .compile()
+    )
+    assert compiled.sql == (
+        'select "first_name" as "display ""name""", '
+        '"id" as "display ""name""" from "person"'
+    )
 
 
 def test_generated_query_wrapper_uses_runtime_builder() -> None:
@@ -58,11 +76,12 @@ def test_generated_query_wrapper_uses_runtime_builder() -> None:
         db.select_from("person")
         .inner_join("pet", "person.id", "pet.owner_id")
         .where("species", "=", "dog")
-        .select(["first_name", "pet.name"])
+        .select("first_name")
+        .select_as("pet.name", "pet_name")
         .compile()
     )
     assert compiled.sql == (
-        'select "first_name", "pet"."name" from "person" '
+        'select "first_name", "pet"."name" as "pet_name" from "person" '
         'inner join "pet" on "person"."id" = "pet"."owner_id" '
         'where "species" = $1'
     )
@@ -82,7 +101,8 @@ async def test_string_query_in_transaction_and_connection_scope(tmp_path: Path) 
             rows = await (
                 tx.select_from("person as p")
                 .inner_join("pet", "pet.owner_id", "p.id")
-                .select(["p.first_name", "pet.name as pet_name"])
+                .select("p.first_name")
+                .select_as("pet.name", "pet_name")
                 .execute()
             )
         async with db.connection() as connection:

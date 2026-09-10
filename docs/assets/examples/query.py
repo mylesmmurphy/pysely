@@ -1,9 +1,12 @@
-from schema import Database
+from typing import cast
 
-from pysely import Pysely
+from database import Database
+
+from pysely.dialect import Dialect
 
 # The playground supplies the selected dialect.
-db = Pysely(schema=Database, dialect=dialect)
+dialect = cast(Dialect, globals()["dialect"])
+db = Database(dialect=dialect)
 species = "dog"
 
 query = (
@@ -11,7 +14,8 @@ query = (
     .inner_join("pet", "owner_id", "person.id")
     .where("first_name", "=", "Jennifer")
     .where("species", "=", species)
-    .select(["first_name", "pet.name as pet_name"])
+    .select("first_name")
+    .select_as("pet.name", "pet_name")
 )
 
 compiled = query.compile()
