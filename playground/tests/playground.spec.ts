@@ -91,3 +91,27 @@ test("preserves stock Pyright diagnostics for an invalid join", async ({ page })
   expect(result.some((item: any) => item.code === "reportUnknownMemberType")).toBe(true);
   expect(result.some((item: any) => item.owner === "pysely")).toBe(false);
 });
+
+test("uses Pyright's argument range for an invalid parameter", async ({ page }) => {
+  await page.goto("/playground/");
+  await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
+  await page.evaluate(code => {
+    const monaco = (window as any).monaco;
+    monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
+  }, `${prefix}compiled = (
+    db.select_from("person")
+    .where("first_namee", "=", "Jennifer")
+    .select("first_name")
+    .compile()
+)`);
+  const markers = () => page.evaluate(() => {
+    const monaco = (window as any).monaco;
+    return monaco.editor.getModelMarkers({}).filter((item: any) => item.resource.path === "/workspace/query.py")
+      .map((item: any) => ({ code: item.code, start: item.startLineNumber, end: item.endLineNumber, owner: item.owner }));
+  });
+  await expect.poll(markers).toEqual([
+    expect.objectContaining({ code: "reportArgumentType", owner: "pyright" }),
+  ]);
+  const [marker] = await markers();
+  expect(marker.start).toBe(marker.end);
+});

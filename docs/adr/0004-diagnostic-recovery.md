@@ -101,13 +101,11 @@ to a base class or wrapper does not change that call-site syntax tree. Narrowing
 these ranges generally would require an upstream checker change, separate from
 recovering a failed call's return type.
 
-Distinct intermediate variables are an honest, portable mitigation when editing a
-large query. They do not alter validation, require casts, or promise that later
-errors disappear. Keep fluent examples supported; do not silently rewrite the
-playground input to hide the limitation. Return-annotated helpers are appropriate
-at real application boundaries, not a reason to require verbose query annotations
-everywhere. No checker configuration or public method signature was weakened in
-this follow-up.
+These organization experiments document checker behavior; they are not usage
+guidance. Fluent chaining remains the intended API. Do not rewrite examples or
+playground input to conceal the limitation, and do not recommend splitting chains
+as Pysely's solution. No checker configuration or public method signature was
+weakened in this follow-up.
 
 ## Follow-up: `Self` return annotations
 
@@ -125,5 +123,4 @@ arguments: joins add column scope, and aliases add projected key/value types.
 Replacing those return types with `Self` would preserve the old scope and result
 type instead of expressing the operation. Keep `Self` for operations preserving
 the static query type, and explicit generic return types where it changes. Fluent
-chaining remains the intended API; splitting statements is only an optional
-debugging technique.
+chaining remains the intended API.
