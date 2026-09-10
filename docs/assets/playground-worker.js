@@ -7,7 +7,7 @@ async function initialize() {
   await python.runPythonAsync(`import micropip\nawait micropip.install(${JSON.stringify(wheel)}, deps=False)`);
   const [bridge, database] = await Promise.all([
     fetch(new URL("playground.py?build=4", self.location)),
-    fetch(new URL("examples/database.py", self.location)),
+    fetch(new URL("examples/database.py?build=1", self.location)),
   ]);
   if (!bridge.ok || !database.ok) throw new Error("Could not load playground support");
   await python.runPythonAsync(await bridge.text());

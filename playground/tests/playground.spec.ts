@@ -53,6 +53,33 @@ async def inspect() -> None:
   await expect(page.locator(".suggest-widget.visible")).toContainText("first_name");
 });
 
+test("uses schema value types for where", async ({ page }) => {
+  await page.goto("/playground/");
+  await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
+
+  await replaceQuery(page, `${prefix}query = db.select_from("person")
+query.where("person.status", "!=", "")`);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Control+Space");
+  const suggestions = page.locator(".suggest-widget.visible");
+  await expect(suggestions).toContainText("active");
+  await expect(suggestions).toContainText("inactive");
+
+  await page.keyboard.press("Escape");
+  await replaceQuery(page, `${prefix}query = db.select_from("person")
+query.where("person.status", "!=", "")`);
+  const markers = () => page.evaluate(() => {
+    const monaco = (window as any).monaco;
+    return monaco.editor.getModelMarkers({}).filter(
+      (item: any) => item.resource.path === "/workspace/query.py",
+    );
+  });
+  await expect.poll(markers).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: "reportArgumentType", owner: "pyright" }),
+  ]));
+});
+
 test("scrolls editors and passes wheel scrolling to the page at the boundary", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/playground/");
@@ -99,6 +126,9 @@ test("keeps real execution available", async ({ page }) => {
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
   await expect(page.locator("#playground-sql")).toContainText(
     'select "first_name", "status", "pet"."name" as "pet_name"',
+  );
+  await expect(page.locator(".pysely-playground__parameters")).toContainText(
+    '["Jennifer","dog","inactive"]',
   );
   const query = await page.evaluate(() => {
     const monaco = (window as any).monaco;

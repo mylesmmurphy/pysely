@@ -136,7 +136,7 @@
     retry.hidden = true;
     try {
       const [manifestResponse, typeshedResponse] = await Promise.all([
-        fetch(new URL("intelligence/manifest.json?build=8", assets)),
+        fetch(new URL("intelligence/manifest.json?build=9", assets)),
         fetch(new URL("intelligence/typeshed-fallback.zip", assets)),
       ]);
       if (!manifestResponse.ok || !typeshedResponse.ok) throw new Error("Could not load Pyright assets");
@@ -302,7 +302,7 @@
     const error = root.querySelector("#playground-error");
     try {
       const [, schemaResponse, queryResponse] = await Promise.all([
-        loadEditor(), fetch(new URL("examples/schema.py?build=7", assets)), fetch(new URL("examples/query.py?build=8", assets)),
+        loadEditor(), fetch(new URL("examples/schema.py?build=7", assets)), fetch(new URL("examples/query.py?build=9", assets)),
       ]);
       if (!root.isConnected || version !== mountVersion) return;
       if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");
@@ -375,7 +375,7 @@
         status.setAttribute("aria-busy", "true");
         error.hidden = true;
         if (!worker) {
-          worker = new Worker(new URL("playground-worker.js?build=4", assets), { type: "module" });
+          worker = new Worker(new URL("playground-worker.js?build=5", assets), { type: "module" });
           worker.onmessage = ({ data }) => {
             if (data.id !== id) return;
             busy = false;

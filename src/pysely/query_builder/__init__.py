@@ -1,4 +1,8 @@
-from .schema_query_builder import ExpressionBuilder, TypedSchemaQueryBuilder
+from .schema_query_builder import (
+    ExpressionBuilder,
+    SchemaComparisonOperator,
+    TypedSchemaQueryBuilder,
+)
 from .select_query_builder import SelectQueryBuilder
 from .write_query_builder import (
     DeleteQueryBuilder,
@@ -15,6 +19,7 @@ __all__ = [
     "ExpressionBuilder",
     "InsertQueryBuilder",
     "InsertResult",
+    "SchemaComparisonOperator",
     "SelectQueryBuilder",
     "TypedSchemaQueryBuilder",
     "UpdateQueryBuilder",

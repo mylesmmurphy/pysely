@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import (
@@ -15,7 +16,13 @@ from typing import (
 
 from schema import DatabaseSchema
 
-from pysely import Pysely, TypedSchemaQueryBuilder
+from pysely import (
+    Expression,
+    ExpressionBuilder,
+    Pysely,
+    SchemaComparisonOperator,
+    TypedSchemaQueryBuilder,
+)
 from pysely.dialect import Dialect
 
 PersonColumns: TypeAlias = Literal[
@@ -238,6 +245,115 @@ class DatabaseQuery(
     def select_as(self, source: str, alias: str) -> DatabaseQuery[Any, Any, Any]:
         return cast(
             DatabaseQuery[Any, Any, Any], self._select_as(cast(Any, source), alias)
+        )
+
+    @overload  # type: ignore[override]
+    def where(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        column: Literal["person.id"],
+        operator: SchemaComparisonOperator,
+        value: int,
+    ) -> DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        column: Literal["person.first_name", "first_name"],
+        operator: SchemaComparisonOperator,
+        value: str,
+    ) -> DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        column: Literal["person.last_name", "last_name"],
+        operator: SchemaComparisonOperator,
+        value: str | None,
+    ) -> DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        column: Literal["person.status", "status"],
+        operator: SchemaComparisonOperator,
+        value: Literal["active", "inactive"],
+    ) -> DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        column: Literal["person.verified", "verified"],
+        operator: SchemaComparisonOperator,
+        value: bool,
+    ) -> DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        column: Literal["person.created_at", "created_at"],
+        operator: SchemaComparisonOperator,
+        value: datetime,
+    ) -> DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        column: Literal["pet.id", "pet.owner_id", "owner_id"],
+        operator: SchemaComparisonOperator,
+        value: int,
+    ) -> DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        column: Literal["pet.name", "name"],
+        operator: SchemaComparisonOperator,
+        value: str,
+    ) -> DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        column: Literal["pet.species", "species"],
+        operator: SchemaComparisonOperator,
+        value: Literal["cat", "dog", "hamster"],
+    ) -> DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        column: Literal["pet.birth_date", "birth_date"],
+        operator: SchemaComparisonOperator,
+        value: date | None,
+    ) -> DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        column: Literal["pet.weight_kg", "weight_kg"],
+        operator: SchemaComparisonOperator,
+        value: Decimal | None,
+    ) -> DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT]: ...
+
+    @overload
+    def where(
+        self,
+        column: Callable[[ExpressionBuilder[ColumnT]], Expression[bool]],
+    ) -> DatabaseQuery[ColumnT, ResultKeyT, ResultValueT]: ...
+
+    def where(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self,
+        column: str | Callable[[ExpressionBuilder[ColumnT]], Expression[bool]],
+        operator: SchemaComparisonOperator | None = None,
+        value: object = None,
+    ) -> DatabaseQuery[Any, Any, Any]:
+        if callable(column):
+            return cast(DatabaseQuery[Any, Any, Any], super().where(column))
+        if operator is None:
+            raise TypeError("where() requires an operator and value")
+        return cast(
+            DatabaseQuery[Any, Any, Any],
+            super().where(cast(Any, column), operator, value),
         )
 
     @overload

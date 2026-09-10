@@ -23,7 +23,7 @@ extra_css = [
 ]
 extra_javascript = [
   "assets/site-v3.js",
-  "assets/playground-v9.js",
+  "assets/playground-v10.js",
 ]
 
 [project.extra]

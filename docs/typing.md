@@ -49,7 +49,7 @@ they ship, defining a schema-specific interface is a manual step.
 | Columns before and after inner joins | Available in schema-specific interfaces |
 | Invalid and unjoined columns | Rejected in schema-specific interfaces |
 | Runtime schema validation | Available |
-| Column-specific comparison values | Available through the optional mypy plugin |
+| Direct `.where()` comparison values | Available in schema-specific interfaces |
 | Typed string writes | Not implemented |
 | Narrow `.select()` results | Single literal columns retain result keys; lists and tuples use conservative types |
 | `.select_as(source, alias)` | Direct literal aliases retain key and value types |
