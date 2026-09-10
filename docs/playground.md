@@ -1,9 +1,15 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # Playground
 
-Build a Pysely query and inspect its SQL without connecting to a database. The
-code runs locally in your browser.
+Define your database, write a query, and inspect the SQL. Table and column
+suggestions update from your schema. Press **Ctrl+Space** inside a string to explore.
 
-<div class="pysely-playground">
+<div id="playground-workbench" class="pysely-playground">
   <div class="pysely-playground__toolbar">
     <label for="playground-dialect">Dialect</label>
     <select id="playground-dialect">
@@ -11,46 +17,20 @@ code runs locally in your browser.
       <option value="mysql">MySQL</option>
       <option value="sqlite">SQLite</option>
     </select>
-    <button id="playground-run" type="button">Run</button>
-    <span id="playground-status">Ready</span>
+    <button id="playground-run" type="button" disabled>Run</button>
+    <button id="playground-stop" type="button" disabled>Stop</button>
+    <button id="playground-reset" type="button">Reset example</button>
+    <span id="playground-status" role="status">Loading editors…</span>
   </div>
-  <textarea id="playground-code" spellcheck="false" aria-label="Python code">from pysely import Column, PostgresDialect, MysqlDialect, Pysely, SqliteDialect, Table
-
-
-class UsersColumns:
-    def __init__(self, source: str) -> None:
-        self.id = Column("id", source, writable=False)
-        self.email = Column("email", source)
-
-
-users = Table(
-    name="users",
-    columns=UsersColumns("users"),
-    columns_factory=UsersColumns,
-)
-
-
-async def unavailable_database():
-    raise RuntimeError("The playground only compiles queries")
-
-
-dialects = {
-    "postgres": PostgresDialect(pool=unavailable_database),
-    "mysql": MysqlDialect(pool=unavailable_database),
-    "sqlite": SqliteDialect(database=unavailable_database),
-}
-db = Pysely[object](dialect=dialects[playground_dialect])
-
-compiled = (
-    db.select_from(users)
-    .select(users.c.id, users.c.email)
-    .where(users.c.email.eq("ada@example.com"))
-    .compile()
-)
-
-{"sql": compiled.sql, "parameters": list(compiled.parameters)}</textarea>
-  <pre class="pysely-playground__output"><code id="playground-output">Click Run to compile the query.</code></pre>
+  <div class="pysely-playground__panes">
+    <section><h2>Database <small>schema.py</small></h2><div id="playground-schema" class="pysely-editor"></div></section>
+    <section><h2>Query <small>query.py</small></h2><div id="playground-query" class="pysely-editor"></div></section>
+    <section><h2>SQL <small>compiled</small></h2><div id="playground-sql" class="pysely-editor"></div></section>
+  </div>
+  <div class="pysely-playground__parameters"><span>Parameters</span><code id="playground-parameters">[]</code></div>
+  <pre id="playground-error" role="alert" hidden></pre>
 </div>
 
-The playground is compile-only. It does not send code or database credentials
-to a server and does not execute SQL against a database.
+Queries compile in your browser; no database connection is required. The editors
+provide Python/SQL highlighting and schema-aware query suggestions. For Python
+project type checking and inferred result fields, enable [the mypy plugin](typing.md).

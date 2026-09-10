@@ -13,49 +13,21 @@ uv sync --extra sqlite
 
 Use `postgres` or `mysql` instead of `sqlite` for those databases.
 
-## Define a table
+## Define your database
 
-Pysely keeps row, insert, and update shapes separate. Generated schemas will
-produce these definitions; they can also be written directly today.
+Use one annotated class per table and a database class mapping table names to
+those types. The same definitions drive runtime column validation and the mypy
+plugin's scope and result inference.
 
 ```python
-from typing import Literal, Never, NotRequired, TypedDict
-
-from pysely import Column, Table
-
-
-class UserRow(TypedDict):
+class UserTable:
     id: int
     email: str
     nickname: str | None
 
 
-class UserInsert(TypedDict):
-    email: str
-    nickname: NotRequired[str | None]
-
-
-class UserUpdate(TypedDict, total=False):
-    email: str
-    nickname: str | None
-
-
-class UsersColumns:
-    id: Column[int, Never, Never, Literal["id"], str]
-    email: Column[str, str, str, Literal["email"], str]
-    nickname: Column[str | None, str | None, str | None, Literal["nickname"], str]
-
-    def __init__(self, source: str) -> None:
-        self.id = Column("id", source, writable=False)
-        self.email = Column("email", source)
-        self.nickname = Column("nickname", source, nullable=True)
-
-
-users = Table[UserRow, UserInsert, UserUpdate, UsersColumns](
-    name="users",
-    columns=UsersColumns("users"),
-    columns_factory=UsersColumns,
-)
+class Database:
+    users: UserTable
 ```
 
 ## Connect and query
@@ -67,8 +39,16 @@ from pysely import Pysely, SqliteDialect
 
 
 database = await aiosqlite.connect("app.db", isolation_level=None)
-async with Pysely[object](dialect=SqliteDialect(database=database)) as db:
-    rows = await db.select_from(users).select(users.c.id, users.c.email).execute()
+async with Pysely(schema=Database, dialect=SqliteDialect(database=database)) as db:
+    rows = await (
+        db.select_from("users")
+        .select(["id", "email"])
+        .where("email", "=", "ada@example.com")
+        .execute()
+    )
 ```
 
 All values are passed separately from the generated SQL as driver parameters.
+
+Enable [the mypy plugin](typing.md) for string-reference checks and selected-row
+inference. Try the same API with editor suggestions in the [playground](playground.md).

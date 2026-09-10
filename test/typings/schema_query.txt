@@ -1,0 +1,43 @@
+from typing import TypedDict, assert_type
+from pysely import Pysely
+from test.fixtures.dialects import postgres_dialect
+
+class Person:
+    id: int
+    first_name: str
+
+class Pet:
+    owner_id: int
+    name: str
+
+class Database:
+    person: Person
+    pet: Pet
+
+db = Pysely(schema=Database, dialect=postgres_dialect())
+assert_type(db, Pysely[Database])
+
+class Result(TypedDict):
+    first_name: str
+    pet_name: str
+
+async def query(db: Pysely[Database]) -> list[Result]:
+    return await (db.select_from("person")
+        .inner_join("pet", "owner_id", "person.id")
+        .where("first_name", "=", "Jennifer")
+        .select(["first_name", "pet.name as pet_name"])
+        .execute())
+
+def invalid(db: Pysely[Database]) -> None:
+    db.select_from("missing")
+    db.select_from("person").select("pet.name")
+    db.select_from("person").where("id", "=", "wrong")
+
+async def inferred(db: Pysely[Database]) -> None:
+    row = await (db.select_from("person as p")
+        .inner_join("pet as animal", "animal.owner_id", "p.id")
+        .select("p.first_name")
+        .select("animal.name as pet_name")
+        .execute_take_first_or_throw())
+    assert_type(row["first_name"], str)
+    assert_type(row["pet_name"], str)

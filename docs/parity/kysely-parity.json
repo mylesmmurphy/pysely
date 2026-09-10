@@ -1,5 +1,18 @@
 [
   {
+    "id": "select.schema_strings.inner_join.projection",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-builder/select-query-builder.ts",
+    "upstream_tests": ["test/node/src/select.test.ts", "test/node/src/join.test.ts"],
+    "pysely_api": "Pysely.select_from / SchemaQueryBuilder",
+    "dialect_support": {"postgres": true, "mysql": true, "sqlite": true},
+    "runtime_status": "verified",
+    "mypy_status": "verified",
+    "portable_typing_status": "intentional_difference",
+    "tests": ["test/runtime/test_schema_queries.py", "test/typings/test_schema_plugin.py"],
+    "difference": "Literal read projections are inferred by the optional mypy plugin; other checkers retain dict[str, object]. External editor string completion integration remains separate."
+  },
+  {
     "id": "select.explicit_projection.where",
     "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
     "upstream_source": "src/query-builder/select-query-builder.ts",

@@ -62,10 +62,17 @@ class SelectAllNode:
 
 
 @dataclass(frozen=True, slots=True)
+class JoinNode:
+    table: TableNode
+    on: BinaryOperationNode
+
+
+@dataclass(frozen=True, slots=True)
 class SelectQueryNode:
     from_: tuple[TableNode, ...] = ()
     selections: tuple[OperationNode, ...] = ()
     where: OperationNode | None = None
+    joins: tuple[JoinNode, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +110,7 @@ OperationNode: TypeAlias = (
     | OrNode
     | SelectAllNode
     | SelectQueryNode
+    | JoinNode
     | InsertQueryNode
     | UpdateQueryNode
     | DeleteQueryNode

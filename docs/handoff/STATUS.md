@@ -28,24 +28,29 @@ Current stage: 2 - Execution
 - Live PostgreSQL 16.4 and MySQL 8.4 read, write, and rollback verification in CI.
 - Single-connection scopes and rollback after transaction body or commit failure.
 - Parenthesized boolean groups and basic column-reference comparisons.
+- Annotated database schemas, string read queries, inner joins, and aliases.
+- Optional mypy plugin with scope validation and selected-row TypedDict inference.
+- Monaco schema/query/SQL editors, schema-aware completion, and interruptible
+  browser compilation in a worker.
 
 ## Implemented but unverified
 
-- Exact projected-row inference; portable typing is intentionally conservative.
+- No claims beyond the supported literal string read surface; broader inference
+  and external editor completion remain unimplemented.
 
 ## Remaining parity gaps
 
 - The public export and test-case inventory is in progress.
 - MSSQL and PGlite runtime drivers are deferred until the primary dialects meet
   production-readiness gates.
-- Joins, advanced expressions, CTEs, set operations, DDL, and other SQL surface
+- Outer joins, advanced expressions, CTEs, set operations, DDL, and other SQL surface
   features remain planned.
 
 ## Validation
 
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv run pytest -q`: 40 passed and 2 service-dependent skips; live SQLite ran.
+- Local `pytest -q`: 47 passed and 2 service-dependent skips; live SQLite ran.
 - PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
 - GitHub Actions run `34409360952`: PostgreSQL, MySQL, and all core matrix jobs passed.
 - `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
@@ -64,6 +69,6 @@ Current stage: 2 - Execution
 
 ## Next session
 
-1. Add ordering, limits, and joins.
-2. Prove the hard portable typing fixtures before starting the mypy plugin.
+1. Complete string writes and generated read/write metadata.
+2. Add external editor string completion support, ordering, limits, and outer joins.
 3. Keep MSSQL and PGlite runtime work deferred until production readiness.

@@ -12,6 +12,7 @@ from .nodes import (
     IdentifierNode,
     InsertQueryNode,
     IsNullNode,
+    JoinNode,
     OperationNode,
     OrNode,
     ReferenceNode,
@@ -95,6 +96,14 @@ class OperationNodeTransformer:
             from_=tuple(self._table(table) for table in node.from_),
             selections=tuple(self.transform(item) for item in node.selections),
             where=self.transform(node.where) if node.where else None,
+            joins=tuple(cast(JoinNode, self.transform(join)) for join in node.joins),
+        )
+
+    def transform_JoinNode(self, node: JoinNode) -> OperationNode:
+        return replace(
+            node,
+            table=self._table(node.table),
+            on=cast(BinaryOperationNode, self.transform(node.on)),
         )
 
     def transform_InsertQueryNode(self, node: InsertQueryNode) -> OperationNode:

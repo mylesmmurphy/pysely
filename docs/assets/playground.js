@@ -1,51 +1,176 @@
-const pyselyWheel = "/wheels/pysely-0.1.0.dev0-py3-none-any.whl";
-let pyselyRuntime;
+(() => {
+  const assets = new URL(".", document.currentScript.src);
+  const monacoBase = "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs";
+  let loading;
+  let cleanup = () => {};
 
-async function loadPysely() {
-  if (!pyselyRuntime) {
-    pyselyRuntime = (async () => {
-      const wheelUrl = new URL(pyselyWheel, window.location.origin).href;
-      const runtime = await loadPyodide({
-        indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.6/full/",
+  function loadEditor() {
+    loading ??= new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `${monacoBase}/loader.js`;
+      script.onerror = () => reject(new Error("Could not load the code editor. Reload to retry."));
+      script.onload = () => {
+        window.MonacoEnvironment = {
+          getWorkerUrl: () => URL.createObjectURL(new Blob([
+            `self.MonacoEnvironment={baseUrl:${JSON.stringify(monacoBase + "/../")}};importScripts(${JSON.stringify(monacoBase + "/base/worker/workerMain.js")});`,
+          ], { type: "text/javascript" })),
+        };
+        window.require.config({ paths: { vs: monacoBase } });
+        window.require(["vs/editor/editor.main"], resolve, reject);
+      };
+      document.head.append(script);
+    });
+    return loading;
+  }
+
+  async function mount() {
+    cleanup();
+    const root = document.querySelector("#playground-workbench");
+    if (!root) return;
+    const status = root.querySelector("#playground-status");
+    const error = root.querySelector("#playground-error");
+    try {
+      const [, schemaResponse, queryResponse] = await Promise.all([
+        loadEditor(), fetch(new URL("examples/schema.py", assets)), fetch(new URL("examples/query.py", assets)),
+      ]);
+      if (!root.isConnected) return;
+      if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");
+      const examples = await Promise.all([schemaResponse.text(), queryResponse.text()]);
+      const monaco = window.monaco;
+      const options = { automaticLayout: true, minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false,
+        padding: { top: 12 }, tabSize: 4, wordWrap: "on", fixedOverflowWidgets: true,
+        quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
+      const models = [
+        monaco.editor.createModel(examples[0], "python", monaco.Uri.parse("file:///schema.py")),
+        monaco.editor.createModel(examples[1], "python", monaco.Uri.parse("file:///query.py")),
+        monaco.editor.createModel("-- Loading Python…", "sql"),
+      ];
+      const editors = ["schema", "query", "sql"].map((name, index) => monaco.editor.create(
+        root.querySelector(`#playground-${name}`), { ...options, model: models[index], readOnly: index === 2, ariaLabel: `${name} editor` },
+      ));
+      const theme = () => monaco.editor.setTheme(document.body.dataset.mdColorScheme === "slate" ? "vs-dark" : "vs");
+      theme();
+      const observer = new MutationObserver(theme);
+      observer.observe(document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+      const runButton = root.querySelector("#playground-run");
+      const stopButton = root.querySelector("#playground-stop");
+      const dialect = root.querySelector("#playground-dialect");
+      let tables = {};
+      let worker;
+      let id = 0;
+      let timer;
+      let busy = false;
+      let pending = false;
+
+      function run() {
+        clearTimeout(timer);
+        if (busy) { pending = true; return; }
+        busy = true;
+        runButton.disabled = true;
+        stopButton.disabled = false;
+        status.textContent = worker ? "Compiling…" : "Loading Python…";
+        error.hidden = true;
+        if (!worker) {
+          worker = new Worker(new URL("playground-worker.js", assets), { type: "module" });
+          worker.onmessage = ({ data }) => {
+            if (data.id !== id) return;
+            busy = false;
+            runButton.disabled = false;
+            stopButton.disabled = true;
+            tables = data.tables || {};
+            for (const model of models) monaco.editor.setModelMarkers(model, "pysely", []);
+            if (data.error) {
+              status.textContent = "Check your code";
+              error.textContent = data.error;
+              error.hidden = false;
+              models[2].setValue("-- Fix the error to compile this query.");
+              root.querySelector("#playground-parameters").textContent = "[]";
+              const model = data.file === "schema.py" ? models[0] : models[1];
+              const line = Math.min(data.line || 1, model.getLineCount());
+              monaco.editor.setModelMarkers(model, "pysely", [{ startLineNumber: line, endLineNumber: line,
+                startColumn: 1, endColumn: model.getLineMaxColumn(line), message: data.error, severity: monaco.MarkerSeverity.Error }]);
+            } else {
+              status.textContent = "Compiled";
+              error.textContent = "";
+              error.hidden = true;
+              models[2].setValue(data.sql);
+              root.querySelector("#playground-parameters").textContent = JSON.stringify(data.parameters);
+            }
+            if (pending) { pending = false; run(); }
+          };
+          worker.onerror = (event) => {
+            stop();
+            status.textContent = "Could not start Python";
+            error.textContent = event.message;
+            error.hidden = false;
+          };
+        }
+        worker.postMessage({ id: ++id, schema: models[0].getValue(), query: models[1].getValue(), dialect: dialect.value });
+      }
+
+      function stop() {
+        clearTimeout(timer);
+        worker?.terminate();
+        worker = undefined;
+        busy = pending = false;
+        runButton.disabled = false;
+        stopButton.disabled = true;
+        status.textContent = "Stopped";
+      }
+
+      const completion = monaco.languages.registerCompletionItemProvider("python", {
+        triggerCharacters: ['"', "'", "."],
+        provideCompletionItems(model, position) {
+          if (model !== models[1]) return { suggestions: [] };
+          const before = model.getValueInRange({ startLineNumber: 1, startColumn: 1, endLineNumber: position.lineNumber, endColumn: position.column });
+          const current = before.match(/(?:select_from|inner_join|where|select)\([^\n]*$/)?.[0] || "";
+          const quoted = current.match(/["']([^"']*)$/);
+          const word = model.getWordUntilPosition(position);
+          let entries = [];
+          if (quoted) {
+            if (current.startsWith("where(") && /["'][^"']*["']\s*,/.test(current)) return { suggestions: [] };
+            const tableArgument = /^(select_from|inner_join)\(\s*["'][^"']*$/.test(current);
+            if (tableArgument) entries = Object.keys(tables).map(name => [name, "table"]);
+            else {
+              const scope = {};
+              for (const match of before.matchAll(/\.(select_from|inner_join)\(\s*["']([^"']+)["']/g)) {
+                if (match[1] === "select_from") for (const key of Object.keys(scope)) delete scope[key];
+                const [name, alias = name] = match[2].split(" as ");
+                if (tables[name]) scope[alias] = tables[name];
+              }
+              const counts = {};
+              for (const columns of Object.values(scope)) for (const name of Object.keys(columns)) counts[name] = (counts[name] || 0) + 1;
+              for (const [alias, columns] of Object.entries(scope)) for (const [name, type] of Object.entries(columns)) {
+                entries.push([`${alias}.${name}`, type]);
+                if (counts[name] === 1) entries.push([name, type]);
+              }
+            }
+          } else if (/\.\w*$/.test(before)) {
+            entries = ["select_from", "inner_join", "where", "select", "compile", "execute", "execute_take_first", "execute_take_first_or_throw"].map(name => [name, "Pysely method"]);
+          }
+          const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+            startColumn: quoted ? position.column - quoted[1].length : word.startColumn, endColumn: position.column };
+          return { suggestions: entries.map(([name, detail]) => ({ label: name, insertText: name, detail, range,
+            kind: quoted ? monaco.languages.CompletionItemKind.Field : monaco.languages.CompletionItemKind.Method })) };
+        },
       });
-      await runtime.loadPackage("micropip");
-      await runtime.runPythonAsync(
-        `import micropip\nawait micropip.install(${JSON.stringify(wheelUrl)}, deps=False)`,
-      );
-      return runtime;
-    })();
+      const subscriptions = models.slice(0, 2).map(model => model.onDidChangeContent(() => {
+        clearTimeout(timer);
+        timer = setTimeout(run, 600);
+      }));
+      runButton.onclick = run;
+      stopButton.onclick = stop;
+      dialect.onchange = run;
+      root.querySelector("#playground-reset").onclick = () => { stop(); models[0].setValue(examples[0]); models[1].setValue(examples[1]); run(); };
+      editors[1].addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
+      cleanup = () => { stop(); observer.disconnect(); completion.dispose(); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      run();
+    } catch (failure) {
+      status.textContent = "Could not load playground";
+      error.textContent = String(failure);
+      error.hidden = false;
+    }
   }
-  return pyselyRuntime;
-}
-
-document.addEventListener("click", async (event) => {
-  if (!event.target.closest("#playground-run")) return;
-
-  const button = document.querySelector("#playground-run");
-  const code = document.querySelector("#playground-code");
-  const dialect = document.querySelector("#playground-dialect");
-  const output = document.querySelector("#playground-output");
-  const status = document.querySelector("#playground-status");
-
-  button.disabled = true;
-  status.textContent = "Loading Python…";
-
-  try {
-    const runtime = await loadPysely();
-    status.textContent = "Running…";
-    const result = await runtime.runPythonAsync(
-      `playground_dialect = ${JSON.stringify(dialect.value)}\n${code.value}`,
-    );
-    const value = result?.toJs
-      ? result.toJs({ dict_converter: Object.fromEntries })
-      : result;
-    result?.destroy?.();
-    output.textContent = JSON.stringify(value, null, 2);
-    status.textContent = "Complete";
-  } catch (error) {
-    output.textContent = String(error);
-    status.textContent = "Error";
-  } finally {
-    button.disabled = false;
-  }
-});
+  if (typeof document$ !== "undefined") document$.subscribe(mount);
+  else mount();
+})();

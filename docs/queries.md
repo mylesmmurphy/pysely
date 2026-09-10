@@ -4,9 +4,10 @@
 
 ```python
 query = (
-    db.select_from(users)
-    .select(users.c.id, users.c.email.as_("login"))
-    .where(users.c.id.eq(1))
+    db.select_from("person")
+    .inner_join("pet", "owner_id", "person.id")
+    .select(["first_name", "pet.name as pet_name"])
+    .where("species", "=", "dog")
 )
 
 compiled = query.compile()
@@ -16,7 +17,12 @@ rows = await query.execute()
 Use `execute_take_first()` when zero or one row is expected, or
 `execute_take_first_or_throw()` when a missing row is an error.
 
-## Boolean groups and references
+These queries use the schema passed as `schema=Database`; see
+[Schema and typing](typing.md). Ambiguous columns must be qualified with their
+table or alias. The remaining examples below document the earlier object-based
+expression and write API while those operations move to the schema model.
+
+## Object-based boolean groups and references
 
 ```python
 from pysely import and_, or_

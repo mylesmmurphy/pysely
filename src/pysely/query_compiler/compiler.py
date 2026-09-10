@@ -79,6 +79,10 @@ class QueryCompiler:
         sql = "select " + ", ".join(self._compile(item) for item in node.selections)
         if node.from_:
             sql += " from " + ", ".join(self._compile(table) for table in node.from_)
+        for join in node.joins:
+            sql += (
+                f" inner join {self._compile(join.table)} on {self._compile(join.on)}"
+            )
         if node.where:
             sql += " where " + self._compile(node.where)
         return sql

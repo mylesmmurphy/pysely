@@ -5,6 +5,9 @@ Pysely is under active development and is not production-ready.
 ## Implemented
 
 - Immutable query nodes and builders
+- Annotated database schemas and string-based read queries with inner joins
+- Mypy plugin for literal string read queries, scope checks, and projected rows
+- Three-pane Monaco playground with schema-aware table and column completion
 - PostgreSQL, MySQL, and SQLite compilation and async execution
 - Select, insert, update, and delete
 - Bound predicates, aliases, returning projections, and result metadata
@@ -14,7 +17,7 @@ Pysely is under active development and is not production-ready.
 
 ## In progress
 
-- Ordering, limits, joins, and the broader Kysely SQL surface
+- Ordering, limits, additional joins, and the broader Kysely SQL surface
 - Stronger projected-row inference
 - Failure-path, cancellation, and lifecycle hardening
 - Schema introspection, generation, migrations, and streaming

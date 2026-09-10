@@ -8,6 +8,7 @@ from .nodes import (
     IdentifierNode,
     InsertQueryNode,
     IsNullNode,
+    JoinNode,
     OperationNode,
     OrNode,
     ReferenceNode,
@@ -70,10 +71,16 @@ class OperationNodeVisitor:
     def visit_SelectQueryNode(self, node: SelectQueryNode) -> None:
         for table in node.from_:
             self.visit(table)
+        for join in node.joins:
+            self.visit(join)
         for selection in node.selections:
             self.visit(selection)
         if node.where:
             self.visit(node.where)
+
+    def visit_JoinNode(self, node: JoinNode) -> None:
+        self.visit(node.table)
+        self.visit(node.on)
 
     def visit_InsertQueryNode(self, node: InsertQueryNode) -> None:
         self.visit(node.into)

@@ -11,9 +11,9 @@ types, and parameterized SQL without hiding the SQL you write.
 
 ```python
 rows = await (
-    db.select_from(users)
-    .select(users.c.id, users.c.email)
-    .where(users.c.email.eq("ada@example.com"))
+    db.select_from("person")
+    .select(["id", "first_name"])
+    .where("first_name", "=", "Jennifer")
     .execute()
 )
 ```

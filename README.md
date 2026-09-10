@@ -12,9 +12,9 @@ Insert, update, and delete builders support bound values and returning projectio
 
 ```python
 query = (
-    db.select_from(users)
-    .select(users.c.id, users.c.email)
-    .where(users.c.email.eq("myles@example.com"))
+    db.select_from("person")
+    .select(["id", "first_name"])
+    .where("first_name", "=", "Jennifer")
 )
 
 compiled = query.compile()
