@@ -4,15 +4,12 @@ from dataclasses import dataclass, replace
 from typing import Generic, TypeVar, cast
 from uuid import uuid4
 
-from pysely.errors import InvalidQueryError, NoResultError
+from pysely.errors import NoResultError
 from pysely.operation_node import (
     AndNode,
     BinaryOperationNode,
-    IsNullNode,
     JoinNode,
-    OperationNode,
     SelectQueryNode,
-    ValueNode,
 )
 from pysely.query_compiler import CompiledQuery
 from pysely.query_executor import QueryExecutor
@@ -55,26 +52,7 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
     def where(
         self, column: str, operator: str, value: object
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
-        if operator not in {
-            "=",
-            "!=",
-            "<>",
-            "<",
-            "<=",
-            ">",
-            ">=",
-            "is",
-            "is not",
-            "like",
-            "not like",
-        }:
-            raise InvalidQueryError(f"Unsupported comparison operator: {operator}")
-        reference = self._schema.reference(self._scope, column)
-        predicate: OperationNode = BinaryOperationNode(
-            reference, operator, ValueNode(value)
-        )
-        if value is None and operator in {"is", "is not"}:
-            predicate = IsNullNode(reference, negated=operator == "is not")
+        predicate = self._schema.predicate(self._scope, column, operator, value)
         where = (
             AndNode((self._node.where, predicate)) if self._node.where else predicate
         )

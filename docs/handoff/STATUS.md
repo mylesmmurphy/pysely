@@ -4,7 +4,7 @@ Baseline commit: `c54987f4d5bb1a9573c8d83e1cba7365770cc016`
 
 Current project commit: see repository `HEAD`
 
-Current stage: 2 - Execution
+Current stage: 3 - SQL surface
 
 ## Implemented and verified
 
@@ -30,13 +30,14 @@ Current stage: 2 - Execution
 - Parenthesized boolean groups and basic column-reference comparisons.
 - Annotated database schemas, string read queries, inner joins, and aliases.
 - Optional mypy plugin with scope validation and selected-row TypedDict inference.
+- Schema-backed string inserts, updates, deletes, predicates, and returning fields.
 - Monaco schema/query/SQL editors, schema-aware completion, and interruptible
   browser compilation in a worker.
 
 ## Implemented but unverified
 
-- No claims beyond the supported literal string read surface; broader inference
-  and external editor completion remain unimplemented.
+- Exact delete-returning inference and external editor completion remain
+  unimplemented.
 
 ## Remaining parity gaps
 
@@ -50,7 +51,7 @@ Current stage: 2 - Execution
 
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- Local `pytest -q`: 47 passed and 2 service-dependent skips; live SQLite ran.
+- Local `pytest -q`: 52 passed and 2 service-dependent skips; live SQLite ran.
 - PostgreSQL/MySQL live suites and required-service `--dialect` gates are wired in CI.
 - GitHub Actions run `34409360952`: PostgreSQL, MySQL, and all core matrix jobs passed.
 - `uv sync --locked --all-extras`: passed with asyncpg 0.31.0, asyncmy 0.2.14,
@@ -69,6 +70,6 @@ Current stage: 2 - Execution
 
 ## Next session
 
-1. Complete string writes and generated read/write metadata.
-2. Add external editor string completion support, ordering, limits, and outer joins.
-3. Keep MSSQL and PGlite runtime work deferred until production readiness.
+1. Add ordering, limits, outer joins, and the remaining core query surface.
+2. Add schema builders, migrations, introspection, and generated schema classes.
+3. Keep external editor completion, MSSQL, and PGlite runtime work deferred.

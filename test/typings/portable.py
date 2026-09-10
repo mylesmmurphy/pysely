@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Literal, assert_type
 
 from pysely import (
@@ -42,3 +43,27 @@ assert_type(update, UpdateQueryBuilder[UserUpdate, UpdateResult])
 
 delete = db.delete_from(users).where(users.c.id.eq(1))
 assert_type(delete, DeleteQueryBuilder[DeleteResult])
+
+
+class Database:
+    users: UserRow
+
+
+schema_db = Pysely(schema=Database, dialect=postgres_dialect())
+schema_insert = schema_db.insert_into("users").values({"email": "ada@example.com"})
+assert_type(
+    schema_insert,
+    InsertQueryBuilder[Mapping[str, object], InsertResult],
+)
+assert_type(
+    schema_insert.returning(["id", "email"]),
+    InsertQueryBuilder[Mapping[str, object], list[dict[str, object]]],
+)
+assert_type(
+    schema_db.update_table("users").set({"nickname": "Ada"}),
+    UpdateQueryBuilder[Mapping[str, object], UpdateResult],
+)
+assert_type(
+    schema_db.delete_from("users").where("id", "=", 1),
+    DeleteQueryBuilder[DeleteResult],
+)

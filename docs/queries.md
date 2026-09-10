@@ -20,7 +20,7 @@ Use `execute_take_first()` when zero or one row is expected, or
 These queries use the schema passed as `schema=Database`; see
 [Schema and typing](typing.md). Ambiguous columns must be qualified with their
 table or alias. The remaining examples below document the earlier object-based
-expression and write API while those operations move to the schema model.
+expression API. String writes use the same database schema and query compiler.
 
 ## Object-based boolean groups and references
 
@@ -44,9 +44,9 @@ reference_query = query.where_ref(users.c.email, "!=", users.c.nickname)
 
 ```python
 inserted = await (
-    db.insert_into(users)
-    .values({"email": "ada@example.com"})
-    .returning(users.c.id, users.c.email)
+    db.insert_into("person")
+    .values({"first_name": "Ada"})
+    .returning(["id", "first_name"])
     .execute_take_first_or_throw()
 )
 ```
@@ -58,20 +58,20 @@ provide affected-row and insert-ID metadata.
 
 ```python
 await (
-    db.update_table(users)
-    .set({"nickname": "Ada"})
-    .where(users.c.id.eq(1))
+    db.update_table("person")
+    .set({"first_name": "Ada"})
+    .where("id", "=", 1)
     .execute()
 )
 
-await db.delete_from(users).where(users.c.id.eq(1)).execute()
+await db.delete_from("person").where("id", "=", 1).execute()
 ```
 
 ## Transactions
 
 ```python
 async with db.transaction() as tx:
-    await tx.insert_into(users).values({"email": "ada@example.com"}).execute()
+    await tx.insert_into("person").values({"first_name": "Ada"}).execute()
 ```
 
 The transaction commits on normal exit and rolls back when the block raises.
@@ -82,6 +82,6 @@ connection.
 
 ```python
 async with db.connection() as connection_db:
-    first = await connection_db.select_from(users).select(users.c.id).execute()
-    second = await connection_db.select_from(users).select(users.c.email).execute()
+    first = await connection_db.select_from("person").select("id").execute()
+    second = await connection_db.select_from("person").select("first_name").execute()
 ```

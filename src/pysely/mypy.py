@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from mypy.nodes import ListExpr, StrExpr, TupleExpr, Var
+from mypy.nodes import DictExpr, ListExpr, StrExpr, TupleExpr, Var
 from mypy.plugin import MethodContext, Plugin
 from mypy.subtypes import is_subtype
 from mypy.types import Instance, Type, TypedDictType, get_proper_type
 
 BUILDER = "pysely.query_builder.schema_query_builder.SchemaQueryBuilder"
+INSERT_BUILDER = "pysely.query_builder.write_query_builder.InsertQueryBuilder"
+UPDATE_BUILDER = "pysely.query_builder.write_query_builder.UpdateQueryBuilder"
 
 
 def fields(value: Type) -> dict[str, Type]:
@@ -82,6 +84,84 @@ def select_from(ctx: MethodContext) -> Type:
     return Instance(result.type, [database, record(ctx, scope), record(ctx, {})])
 
 
+def write_from(ctx: MethodContext) -> Type:
+    owner = get_proper_type(ctx.type)
+    result = get_proper_type(ctx.default_return_type)
+    name = literal(ctx, 0)
+    if (
+        not isinstance(owner, Instance)
+        or not isinstance(result, Instance)
+        or name is None
+    ):
+        return ctx.default_return_type
+    table, _, _ = name.partition(" as ")
+    tables = fields(owner.args[0])
+    if table not in tables:
+        ctx.api.fail(f"Unknown table: {table}", ctx.context)
+        return result
+    if result.type.fullname in {INSERT_BUILDER, UPDATE_BUILDER}:
+        return Instance(result.type, [tables[table], result.args[1]])
+    return result
+
+
+def write_values(ctx: MethodContext) -> Type:
+    owner = get_proper_type(ctx.type)
+    if not isinstance(owner, Instance) or not ctx.args[0]:
+        return ctx.default_return_type
+    expression = ctx.args[0][0]
+    if not isinstance(expression, DictExpr):
+        return owner
+    columns = fields(owner.args[0])
+    for key, value in expression.items:
+        if not isinstance(key, StrExpr):
+            continue
+        expected = columns.get(key.value)
+        if expected is None:
+            ctx.api.fail(f"Unknown write column: {key.value}", key)
+        elif not is_subtype(ctx.api.get_expression_type(value), expected):
+            ctx.api.fail(f"Incompatible value for column {key.value}", value)
+    return owner
+
+
+def write_method(method: str) -> Callable[[MethodContext], Type]:
+    def hook(ctx: MethodContext) -> Type:
+        owner = get_proper_type(ctx.type)
+        if not isinstance(owner, Instance):
+            return ctx.default_return_type
+        row = owner.args[0]
+        columns = fields(row)
+        if not columns:
+            return ctx.default_return_type
+        if method == "where":
+            name = literal(ctx, 0)
+            if name is None:
+                return owner
+            expected = columns.get(name.rsplit(".", 1)[-1])
+            if expected is None:
+                ctx.api.fail(f"Unknown column in query scope: {name}", ctx.context)
+            elif ctx.arg_types[2] and not is_subtype(ctx.arg_types[2][0], expected):
+                ctx.api.fail(f"Incompatible value for column {name}", ctx.context)
+            return owner
+
+        expressions = [item for group in ctx.args for item in group]
+        if len(expressions) == 1 and isinstance(expressions[0], ListExpr | TupleExpr):
+            expressions = expressions[0].items
+        selected: dict[str, Type] = {}
+        for item in expressions:
+            if not isinstance(item, StrExpr):
+                return ctx.default_return_type
+            name, _, alias = item.value.partition(" as ")
+            value = columns.get(name.rsplit(".", 1)[-1])
+            if value is None:
+                ctx.api.fail(f"Unknown column in query scope: {name}", item)
+            else:
+                selected[alias or name.rsplit(".", 1)[-1]] = value
+        result = ctx.api.named_generic_type("builtins.list", [record(ctx, selected)])
+        return Instance(owner.type, [row, result])
+
+    return hook
+
+
 def query_method(method: str) -> Callable[[MethodContext], Type]:
     def hook(ctx: MethodContext) -> Type:
         owner = get_proper_type(ctx.type)
@@ -141,9 +221,21 @@ class PyselyPlugin(Plugin):
     def get_method_hook(self, fullname: str) -> Callable[[MethodContext], Type] | None:
         if fullname == "pysely.pysely.Pysely.select_from":
             return select_from
+        if fullname in {
+            "pysely.pysely.Pysely.insert_into",
+            "pysely.pysely.Pysely.update_table",
+            "pysely.pysely.Pysely.delete_from",
+        }:
+            return write_from
         for method in ("select", "where", "inner_join"):
             if fullname == f"{BUILDER}.{method}":
                 return query_method(method)
+        if fullname in {f"{INSERT_BUILDER}.values", f"{UPDATE_BUILDER}.set"}:
+            return write_values
+        for builder in (INSERT_BUILDER, UPDATE_BUILDER):
+            for method in ("where", "returning"):
+                if fullname == f"{builder}.{method}":
+                    return write_method(method)
         return None
 
 

@@ -1,0 +1,49 @@
+from typing import TypedDict, assert_type
+
+from pysely import Pysely
+from test.fixtures.dialects import postgres_dialect
+
+
+class Person:
+    id: int
+    first_name: str
+
+
+class Database:
+    person: Person
+
+
+class ReturnedPerson(TypedDict):
+    id: int
+    first_name: str
+
+
+db = Pysely(schema=Database, dialect=postgres_dialect())
+
+
+async def valid() -> None:
+    inserted = await (
+        db.insert_into("person")
+        .values({"first_name": "Ada"})
+        .returning(["id", "first_name"])
+        .execute()
+    )
+    assert_type(inserted, list[ReturnedPerson])
+    updated = await (
+        db.update_table("person")
+        .set({"first_name": "Grace"})
+        .where("id", "=", 1)
+        .returning("first_name")
+        .execute()
+    )
+    assert_type(updated[0]["first_name"], str)
+
+
+def invalid() -> None:
+    db.insert_into("missing")
+    db.insert_into("person").values({"missing": True})
+    db.insert_into("person").values({"first_name": 1})
+    db.update_table("person").set({"first_name": 1})
+    db.update_table("person").where("missing", "=", True)
+    db.update_table("person").where("id", "=", "wrong")
+    db.update_table("person").returning("missing")

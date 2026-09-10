@@ -6,6 +6,16 @@ from pysely import DeleteResult, InsertResult, Pysely, UpdateResult
 from test.runtime.test_sqlite_execution import create_database, sqlite_dialect, users
 
 
+class UserTable:
+    id: int
+    email: str
+    nickname: str | None
+
+
+class Database:
+    users: UserTable
+
+
 async def test_insert_update_delete_with_returning(tmp_path) -> None:
     database = str(tmp_path / "pysely.db")
     await create_database(database)
@@ -57,6 +67,36 @@ async def test_non_returning_write_metadata(tmp_path) -> None:
     assert inserted == InsertResult(affected_rows=1, insert_id=3)
     assert updated == UpdateResult(affected_rows=1, changed_rows=None)
     assert deleted == DeleteResult(affected_rows=1)
+
+
+async def test_schema_backed_string_writes(tmp_path) -> None:
+    database = str(tmp_path / "pysely.db")
+    await create_database(database)
+
+    async with Pysely(schema=Database, dialect=sqlite_dialect(database)) as db:
+        inserted = await (
+            db.insert_into("users")
+            .values({"email": "linus@example.com"})
+            .returning(["id", "email"])
+            .execute_take_first_or_throw()
+        )
+        updated = await (
+            db.update_table("users")
+            .set({"nickname": "Linus"})
+            .where("id", "=", inserted["id"])
+            .returning("nickname")
+            .execute()
+        )
+        deleted = await (
+            db.delete_from("users")
+            .where("id", "=", inserted["id"])
+            .returning("email")
+            .execute()
+        )
+
+    assert inserted == {"id": 3, "email": "linus@example.com"}
+    assert updated == [{"nickname": "Linus"}]
+    assert deleted == [{"email": "linus@example.com"}]
 
 
 async def test_transaction_commits_and_rolls_back_writes(tmp_path) -> None:

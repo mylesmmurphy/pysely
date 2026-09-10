@@ -30,22 +30,18 @@ Enable the optional plugin in your project's `pyproject.toml`:
 plugins = ["pysely.mypy"]
 ```
 
-For literal string read queries the plugin checks table and column names, tracks
-inner joins and table aliases, validates comparison values, and infers a
-`TypedDict` result containing the selected fields, including selection aliases.
+For literal string queries the plugin checks table and column names, tracks inner
+joins and table aliases, validates comparison values and write keys, and infers a
+`TypedDict` result containing selected fields and insert/update returning fields.
 Without the plugin, results use the conservative `dict[str, object]` type.
 
 The plugin adds mypy diagnostics and inference. It does not install completion
 support into Pylance or other Python language servers. The playground provides its
-own schema-aware table and column suggestions through Monaco. General Python
-language-server features and generated editor stubs are not implemented yet.
+own schema-aware table and column suggestions through Monaco.
 
-VS Code/Pylance is the first external editor target. Cross-editor support should
-reuse schema/query analysis rather than change the public API. Standard type
-stubs can expose literal names; scope-sensitive completion across joins and
-aliases needs additional editor tooling. Support in every editor is not yet
-claimed.
+External-editor completion is deferred until the core query, schema, migration,
+and code-generation surfaces are stable. See the [roadmap](ROADMAP.md).
 
-The initial string query surface covers reads, inner joins, predicates, and
-projections. The existing object-based write builders remain available while
-write schema metadata and string writes are brought into this model.
+The initial string query surface covers reads, inner joins, predicates,
+projections, inserts, updates, deletes, and returning projections. The earlier
+object-based builders remain available for compatibility.

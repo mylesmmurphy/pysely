@@ -77,12 +77,13 @@
       "sqlite": true
     },
     "runtime_status": "verified",
-    "mypy_status": "planned",
+    "mypy_status": "verified",
     "portable_typing_status": "verified",
     "tests": [
       "test/compiler/test_write.py",
       "test/runtime/test_sqlite_writes.py",
-      "test/typings/portable.py"
+      "test/typings/portable.py",
+      "test/typings/test_schema_plugin.py"
     ],
     "difference": null
   },

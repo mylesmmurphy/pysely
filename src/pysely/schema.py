@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import get_type_hints
 
 from pysely.errors import InvalidQueryError
-from pysely.operation_node import AliasNode, IdentifierNode, ReferenceNode, TableNode
+from pysely.operation_node import (
+    AliasNode,
+    BinaryOperationNode,
+    IdentifierNode,
+    IsNullNode,
+    OperationNode,
+    ReferenceNode,
+    TableNode,
+    ValueNode,
+)
 
 
 def split_alias(value: str) -> tuple[str, str]:
@@ -68,3 +78,31 @@ class Schema:
         name, alias = split_alias(value)
         node = self.reference(scope, name)
         return AliasNode(node, IdentifierNode(alias)) if alias != name else node
+
+    def predicate(
+        self, scope: dict[str, str], column: str, operator: str, value: object
+    ) -> OperationNode:
+        if operator not in {
+            "=",
+            "!=",
+            "<>",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "is",
+            "is not",
+            "like",
+            "not like",
+        }:
+            raise InvalidQueryError(f"Unsupported comparison operator: {operator}")
+        reference = self.reference(scope, column)
+        if value is None and operator in {"is", "is not"}:
+            return IsNullNode(reference, negated=operator == "is not")
+        return BinaryOperationNode(reference, operator, ValueNode(value))
+
+    def validate_values(self, table: str, values: Mapping[str, object]) -> None:
+        unknown = values.keys() - self.tables[table].keys()
+        if unknown:
+            names = ", ".join(sorted(unknown))
+            raise InvalidQueryError(f"Unknown column for {table}: {names}")

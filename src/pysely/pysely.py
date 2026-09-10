@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import TracebackType
 from typing import Generic, TypeVar, overload
 
@@ -19,6 +20,9 @@ from pysely.query_builder.schema_query_builder import SchemaQueryBuilder
 from pysely.query_builder.write_query_builder import (
     create_delete_builder,
     create_insert_builder,
+    create_schema_delete_builder,
+    create_schema_insert_builder,
+    create_schema_update_builder,
     create_update_builder,
 )
 from pysely.query_executor import QueryExecutor, QueryPlugin
@@ -83,19 +87,65 @@ class Pysely(Generic[DatabaseT]):
             )
         return SelectQueryBuilder.from_table(table, self._executor)
 
+    @overload
+    def insert_into(
+        self, table: str
+    ) -> InsertQueryBuilder[Mapping[str, object], InsertResult]: ...
+
+    @overload
     def insert_into(
         self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
-    ) -> InsertQueryBuilder[InsertT, InsertResult]:
+    ) -> InsertQueryBuilder[InsertT, InsertResult]: ...
+
+    def insert_into(
+        self, table: str | Table[RowT, InsertT, UpdateT, ColumnsT]
+    ) -> (
+        InsertQueryBuilder[Mapping[str, object], InsertResult]
+        | InsertQueryBuilder[InsertT, InsertResult]
+    ):
+        if isinstance(table, str):
+            if self._schema is None:
+                raise ValueError("Pass schema=Database to use string table references")
+            return create_schema_insert_builder(table, self._executor, self._schema)
         return create_insert_builder(table, self._executor)
 
+    @overload
+    def update_table(
+        self, table: str
+    ) -> UpdateQueryBuilder[Mapping[str, object], UpdateResult]: ...
+
+    @overload
     def update_table(
         self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
-    ) -> UpdateQueryBuilder[UpdateT, UpdateResult]:
+    ) -> UpdateQueryBuilder[UpdateT, UpdateResult]: ...
+
+    def update_table(
+        self, table: str | Table[RowT, InsertT, UpdateT, ColumnsT]
+    ) -> (
+        UpdateQueryBuilder[Mapping[str, object], UpdateResult]
+        | UpdateQueryBuilder[UpdateT, UpdateResult]
+    ):
+        if isinstance(table, str):
+            if self._schema is None:
+                raise ValueError("Pass schema=Database to use string table references")
+            return create_schema_update_builder(table, self._executor, self._schema)
         return create_update_builder(table, self._executor)
 
+    @overload
+    def delete_from(self, table: str) -> DeleteQueryBuilder[DeleteResult]: ...
+
+    @overload
     def delete_from(
         self, table: Table[RowT, InsertT, UpdateT, ColumnsT]
+    ) -> DeleteQueryBuilder[DeleteResult]: ...
+
+    def delete_from(
+        self, table: str | Table[RowT, InsertT, UpdateT, ColumnsT]
     ) -> DeleteQueryBuilder[DeleteResult]:
+        if isinstance(table, str):
+            if self._schema is None:
+                raise ValueError("Pass schema=Database to use string table references")
+            return create_schema_delete_builder(table, self._executor, self._schema)
         return create_delete_builder(table, self._executor)
 
     def transaction(self) -> TransactionContext[DatabaseT]:
