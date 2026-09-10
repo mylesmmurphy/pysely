@@ -6,8 +6,8 @@ types, and parameterized SQL without hiding the SQL you write.
 
 !!! warning "Early development"
 
-    Pysely is not production-ready or published to PyPI yet. The API can change
-    while the core query surface is completed.
+    Pysely is not production-ready. The API can change while the core query
+    surface is completed.
 
 ```python
 rows = await (

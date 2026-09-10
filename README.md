@@ -20,7 +20,12 @@ query = (
 compiled = query.compile()
 ```
 
-Install driver support with `pysely[postgres]`, `pysely[mysql]`, or
-`pysely[sqlite]`.
+Install the development release with the driver extra for your database:
+
+```bash
+pip install --pre "pysely[postgres]"
+```
+
+The available extras are `postgres`, `mysql`, and `sqlite`.
 
 See `docs/ROADMAP.md` for implementation stages and current acceptance targets.

@@ -1,17 +1,21 @@
 # Getting started
 
-## Install from source
+## Install
 
-Pysely is not published to PyPI yet. Clone the repository and install the driver
-extra for your database:
+Install the development release with the driver extra for your database:
 
 ```bash
-git clone https://github.com/mylesmmurphy/pysely.git
-cd pysely
-uv sync --extra sqlite
+uv add --prerelease allow "pysely[sqlite]"
 ```
 
-Use `postgres` or `mysql` instead of `sqlite` for those databases.
+With pip:
+
+```bash
+pip install --pre "pysely[sqlite]"
+```
+
+Use `postgres` or `mysql` instead of `sqlite` for those databases. Pysely is
+currently a pre-alpha development release.
 
 ## Define your database
 
