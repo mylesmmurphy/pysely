@@ -219,7 +219,7 @@ test("preserves stock Pyright diagnostics for an invalid join", async ({ page })
   expect(result.some((item: any) => item.owner === "pysely")).toBe(false);
 });
 
-test("uses Pyright's argument range for an invalid parameter", async ({ page }) => {
+test("preserves Pyright diagnostics for an invalid where column", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
   await page.evaluate(code => {
@@ -236,9 +236,9 @@ test("uses Pyright's argument range for an invalid parameter", async ({ page }) 
     return monaco.editor.getModelMarkers({}).filter((item: any) => item.resource.path === "/workspace/query.py")
       .map((item: any) => ({ code: item.code, start: item.startLineNumber, end: item.endLineNumber, owner: item.owner }));
   });
-  await expect.poll(markers).toEqual([
+  await expect.poll(markers).toEqual(expect.arrayContaining([
     expect.objectContaining({ code: "reportArgumentType", owner: "pyright" }),
-  ]);
-  const [marker] = await markers();
+  ]));
+  const marker = (await markers()).find((item: any) => item.code === "reportArgumentType")!;
   expect(marker.start).toBe(marker.end);
 });

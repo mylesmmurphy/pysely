@@ -65,8 +65,8 @@ broader mapping type.
 
 Language servers may underline a larger fluent chain when a call fails, because
 the chain is the call's receiver. Failed overloads and missing arguments can also
-produce follow-on unknown-type errors. Ordinary invalid `where` and `select`
-columns receive argument-sized diagnostics.
+produce follow-on unknown-type errors. The invalid argument still receives its
+own argument-sized diagnostic.
 
 Fluent chaining is the intended API. The playground forwards language-server
 diagnostics and does not add execution errors as editor markers.
