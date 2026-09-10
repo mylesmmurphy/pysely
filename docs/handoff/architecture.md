@@ -1,7 +1,7 @@
 # Pysely: Production Architecture and Codex Agent Handoff
 
 **Audience:** a new Codex 5.6 Sol agent implementing the project.  
-**Owner:** Myles Murphy.  
+**Owner:** Pysely contributors.
 **Prepared:** September 9, 2026.  
 **Deliverable status:** architecture and implementation instructions, not an implemented library.  
 **Product:** Pysely, a Python SQL query builder inspired by Kysely, with generated schemas and precise static typing.

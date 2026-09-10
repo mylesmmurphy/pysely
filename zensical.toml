@@ -2,9 +2,8 @@
 site_name = "Pysely"
 site_url = "https://pysely.dev"
 site_description = "An async-first, typed Python SQL query builder inspired by Kysely."
-site_author = "Myles Murphy"
 repo_url = "https://github.com/mylesmmurphy/pysely"
-repo_name = "mylesmmurphy/pysely"
+repo_name = "GitHub"
 edit_uri = "edit/main/docs/"
 copyright = "Released under the <a href=\"https://github.com/mylesmmurphy/pysely/blob/main/LICENSE\">MIT License</a>.<br>Copyright © 2026-present Pysely contributors."
 nav = [
