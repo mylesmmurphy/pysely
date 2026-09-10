@@ -19,7 +19,6 @@ rows = await query.execute()
 - `execute_take_first_or_throw()` raises when no row exists.
 - Pass `schema=Database` for schema-aware string queries.
 - Qualify ambiguous columns with their table or alias.
-- Use table and column objects for expression-based queries.
 
 ### Portable typed aliases
 
@@ -41,23 +40,30 @@ single-string form remains supported at runtime, but exact portable result-key
 inference is not promised for it. Direct literal aliases retain completion and
 value information; dynamic or conflicting aliases use conservative result types.
 
-## Object-based boolean groups and references
+## Boolean groups and column references
 
 ```python
-from pysely import and_, or_
-
-query = db.select_from(users).select(users.c.id).where(
-    and_(
-        users.c.id.ne(0),
-        or_(
-            users.c.nickname.is_null(),
-            users.c.email.eq("ada@example.com"),
+query = (
+    db.select_from("person")
+    .inner_join("pet", "person.id", "pet.owner_id")
+    .select("person.id")
+    .where(
+        lambda eb: eb.and_(
+            eb("person.id", "!=", 0),
+            eb.or_(
+                eb("species", "=", "cat"),
+                eb("species", "=", "dog"),
+            ),
         ),
     )
 )
 
-reference_query = query.where_ref(users.c.email, "!=", users.c.nickname)
+reference_query = query.where_ref("person.id", "=", "pet.owner_id")
 ```
+
+The expression builder uses the columns in the current query scope, so its string
+arguments receive the same completion and type checking as `.where()`. Use
+`.where_ref()` when both sides of a comparison are columns.
 
 ## Insert
 

@@ -21,6 +21,7 @@ from .pysely import Pysely
 from .query_builder import (
     DeleteQueryBuilder,
     DeleteResult,
+    ExpressionBuilder,
     InsertQueryBuilder,
     InsertResult,
     SelectQueryBuilder,
@@ -41,6 +42,7 @@ __all__ = [
     "DeleteResult",
     "Dialect",
     "Expression",
+    "ExpressionBuilder",
     "InsertQueryBuilder",
     "InsertResult",
     "InvalidQueryError",

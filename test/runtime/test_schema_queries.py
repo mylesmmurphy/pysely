@@ -88,6 +88,33 @@ def test_generated_query_wrapper_uses_runtime_builder() -> None:
     assert compiled.parameters == ("dog",)
 
 
+def test_generated_boolean_groups_and_reference_comparisons() -> None:
+    db = GeneratedDatabase(dialect=PostgresDialect(pool=_unavailable_database))
+    compiled = (
+        db.select_from("person")
+        .inner_join("pet", "person.id", "pet.owner_id")
+        .where(
+            lambda eb: eb.and_(
+                eb("person.id", "!=", 0),
+                eb.or_(
+                    eb("species", "=", "cat"),
+                    eb("species", "=", "dog"),
+                ),
+            )
+        )
+        .where_ref("person.id", "=", "pet.owner_id")
+        .select("person.id")
+        .compile()
+    )
+    assert compiled.sql == (
+        'select "person"."id" from "person" '
+        'inner join "pet" on "person"."id" = "pet"."owner_id" '
+        'where (("person"."id" != $1 and ("species" = $2 or "species" = $3)) '
+        'and "person"."id" = "pet"."owner_id")'
+    )
+    assert compiled.parameters == (0, "cat", "dog")
+
+
 async def test_string_query_in_transaction_and_connection_scope(tmp_path: Path) -> None:
     database = await aiosqlite.connect(tmp_path / "schema.db", isolation_level=None)
     await database.executescript(

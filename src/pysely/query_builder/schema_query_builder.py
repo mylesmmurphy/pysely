@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any, Generic, Literal, Self, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, Self, TypeAlias, TypeVar, cast, overload
 from uuid import uuid4
 
 from pysely.errors import NoResultError
+from pysely.expression import Expression
 from pysely.operation_node import (
     AndNode,
     BinaryOperationNode,
     JoinNode,
+    OrNode,
     SelectQueryNode,
 )
 from pysely.query_compiler import CompiledQuery
@@ -22,6 +25,27 @@ RowT = TypeVar("RowT")
 SchemaComparisonOperator: TypeAlias = Literal[
     "=", "!=", "<>", "<", "<=", ">", ">=", "is", "is not", "like", "not like"
 ]
+
+
+@dataclass(frozen=True)
+class ExpressionBuilder(Generic[ColumnsT]):
+    _schema: Schema
+    _scope: dict[str, str]
+
+    def __call__(
+        self, column: ColumnsT, operator: SchemaComparisonOperator, value: object
+    ) -> Expression[bool]:
+        return Expression(self._schema.predicate(self._scope, column, operator, value))
+
+    def and_(self, *expressions: Expression[bool]) -> Expression[bool]:
+        if not expressions:
+            raise ValueError("and_() requires at least one expression")
+        return Expression(AndNode(tuple(expression.node for expression in expressions)))
+
+    def or_(self, *expressions: Expression[bool]) -> Expression[bool]:
+        if not expressions:
+            raise ValueError("or_() requires at least one expression")
+        return Expression(OrNode(tuple(expression.node for expression in expressions)))
 
 
 @dataclass(frozen=True)
@@ -60,9 +84,30 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         )
 
     def where(
-        self, column: str, operator: SchemaComparisonOperator, value: object
+        self,
+        column: str | Callable[[ExpressionBuilder[str]], Expression[bool]],
+        operator: SchemaComparisonOperator | None = None,
+        value: object = None,
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
-        predicate = self._schema.predicate(self._scope, column, operator, value)
+        if callable(column):
+            predicate = column(ExpressionBuilder(self._schema, self._scope)).node
+        else:
+            if operator is None:
+                raise TypeError("where() requires an operator and value")
+            predicate = self._schema.predicate(self._scope, column, operator, value)
+        where = (
+            AndNode((self._node.where, predicate)) if self._node.where else predicate
+        )
+        return replace(self, _node=replace(self._node, where=where))
+
+    def where_ref(
+        self, left: str, operator: SchemaComparisonOperator, right: str
+    ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
+        predicate = BinaryOperationNode(
+            self._schema.reference(self._scope, left),
+            operator,
+            self._schema.reference(self._scope, right),
+        )
         where = (
             AndNode((self._node.where, predicate)) if self._node.where else predicate
         )
@@ -118,10 +163,35 @@ class TypedSchemaQueryBuilder(Generic[DatabaseT, ColumnsT, RowT]):
     def _select_as(self, source: ColumnsT, alias: str) -> Self:
         return replace(self, _query=self._query.select_as(source, alias))
 
+    @overload
     def where(
         self, column: ColumnsT, operator: SchemaComparisonOperator, value: object
+    ) -> Self: ...
+
+    @overload
+    def where(
+        self, column: Callable[[ExpressionBuilder[ColumnsT]], Expression[bool]]
+    ) -> Self: ...
+
+    def where(
+        self,
+        column: ColumnsT | Callable[[ExpressionBuilder[ColumnsT]], Expression[bool]],
+        operator: SchemaComparisonOperator | None = None,
+        value: object = None,
     ) -> Self:
+        if callable(column):
+            expression = cast(
+                Callable[[ExpressionBuilder[str]], Expression[bool]], column
+            )
+            return replace(self, _query=self._query.where(expression))
+        if operator is None:
+            raise TypeError("where() requires an operator and value")
         return replace(self, _query=self._query.where(column, operator, value))
+
+    def where_ref(
+        self, left: ColumnsT, operator: SchemaComparisonOperator, right: ColumnsT
+    ) -> Self:
+        return replace(self, _query=self._query.where_ref(left, operator, right))
 
     def _inner_join(self, table: str, left: str, right: str) -> Self:
         return replace(self, _query=self._query.inner_join(table, left, right))

@@ -32,6 +32,13 @@ assert_type(
     ],
 )
 joined.where("species", "=", "dog")
+joined.where(
+    lambda eb: eb.and_(
+        eb("person.id", "!=", 0),
+        eb.or_(eb("species", "=", "cat"), eb("species", "=", "dog")),
+    )
+)
+joined.where_ref("person.id", "=", "pet.owner_id")
 joined.select(["first_name", "pet.name"])
 
 named = joined.select_as("pet.name", "pet_name")

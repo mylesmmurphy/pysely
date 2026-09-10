@@ -170,18 +170,26 @@ def test_pyright_language_server_completes_generated_schema() -> None:
         code = prefix + (
             'query = db.select_from("person")\n'
             'joined = query.inner_join("pet", "person.id", "pet.owner_id")\n'
+            'joined.where(lambda eb: eb("", "=", "dog"))\n'
+        )
+        expression_columns = completion_labels(process, 5, code, 6)
+        assert {"person.id", "pet.name", "species"} <= expression_columns
+
+        code = prefix + (
+            'query = db.select_from("person")\n'
+            'joined = query.inner_join("pet", "person.id", "pet.owner_id")\n'
             'selected = joined.select("first_name").select_as("pet.name", "pet_name")\n'
             "async def inspect() -> None:\n"
             "    row = await selected.execute_take_first_or_throw()\n"
             '    row[""]\n'
         )
         result_line = code.splitlines().index('    row[""]')
-        result_keys = completion_labels(process, 5, code, result_line)
+        result_keys = completion_labels(process, 6, code, result_line)
         assert {"first_name", "pet_name"} <= result_keys
 
         code = code.replace('.select_as("pet.name", "pet_name")', "")
         code += '    row["pet_name"]\n'
-        result_keys = completion_labels(process, 6, code, result_line)
+        result_keys = completion_labels(process, 7, code, result_line)
         assert "first_name" in result_keys
         assert "pet_name" not in result_keys
     finally:
@@ -199,4 +207,4 @@ def test_pyright_rejects_columns_outside_generated_scope(tmp_path: Path) -> None
         text=True,
     )
     assert result.returncode == 1
-    assert result.stdout.count("reportArgumentType") == 3
+    assert result.stdout.count("reportArgumentType") == 5
