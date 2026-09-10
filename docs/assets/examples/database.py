@@ -38,6 +38,64 @@ class DatabaseQuery(
     TypedSchemaQueryBuilder[DatabaseSchema, ColumnT, dict[ResultKeyT, ResultValueT]]
 ):
     @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        selections: Literal["person.id"],
+    ) -> DatabaseQuery[
+        ColumnT | PersonColumns, ResultKeyT | Literal["id"], ResultValueT | int
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        selections: Literal["pet.id"],
+    ) -> DatabaseQuery[
+        ColumnT | PetColumns, ResultKeyT | Literal["id"], ResultValueT | int
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PersonColumns, ResultKeyT, ResultValueT],
+        selections: Literal["person.first_name", "first_name"],
+    ) -> DatabaseQuery[
+        ColumnT | PersonColumns, ResultKeyT | Literal["first_name"], ResultValueT | str
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        selections: Literal["pet.owner_id", "owner_id"],
+    ) -> DatabaseQuery[
+        ColumnT | PetColumns, ResultKeyT | Literal["owner_id"], ResultValueT | int
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        selections: Literal["pet.name", "name"],
+    ) -> DatabaseQuery[
+        ColumnT | PetColumns, ResultKeyT | Literal["name"], ResultValueT | str
+    ]: ...
+
+    @overload
+    def select(
+        self: DatabaseQuery[ColumnT | PetColumns, ResultKeyT, ResultValueT],
+        selections: Literal["pet.species", "species"],
+    ) -> DatabaseQuery[
+        ColumnT | PetColumns, ResultKeyT | Literal["species"], ResultValueT | str
+    ]: ...
+
+    @overload
+    def select(
+        self, selections: ColumnT | list[ColumnT] | tuple[ColumnT, ...]
+    ) -> DatabaseQuery[ColumnT, str, object]: ...
+
+    def select(
+        self, selections: str | list[Any] | tuple[str, ...]
+    ) -> DatabaseQuery[Any, Any, Any]:
+        return cast(DatabaseQuery[Any, Any, Any], super().select(cast(Any, selections)))
+
+    @overload
     def select_as(
         self,
         source: Literal["person.id", "pet.id", "pet.owner_id", "owner_id"],

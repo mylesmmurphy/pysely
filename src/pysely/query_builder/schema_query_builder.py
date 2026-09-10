@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Generic, Literal, Self, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, Self, TypeAlias, TypeVar, cast
 from uuid import uuid4
 
 from pysely.errors import NoResultError
@@ -111,7 +111,7 @@ class TypedSchemaQueryBuilder(Generic[DatabaseT, ColumnsT, RowT]):
 
     def select(
         self, selections: ColumnsT | list[ColumnsT] | tuple[ColumnsT, ...]
-    ) -> Self:
+    ) -> TypedSchemaQueryBuilder[DatabaseT, ColumnsT, Any]:
         values = cast(str | list[str] | tuple[str, ...], selections)
         return replace(self, _query=self._query.select(values))
 

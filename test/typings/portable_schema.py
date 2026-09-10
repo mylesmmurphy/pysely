@@ -105,5 +105,17 @@ assert_type(
 
 async def projections() -> None:
     row = await named.select("person.id").execute_take_first_or_throw()
-    assert_type(row, dict[Literal["pet_name"], str])
-    assert_type(row["pet_name"], str)
+    assert_type(row, dict[Literal["pet_name", "id"], str | int])
+    assert_type(row["pet_name"], str | int)
+
+    selected = joined.select("first_name").select_as("pet.name", "pet_name")
+    result = await selected.execute_take_first_or_throw()
+    assert_type(result, dict[Literal["first_name", "pet_name"], str])
+    assert_type(result["first_name"], str)
+    assert_type(result["pet_name"], str)
+
+    plain = await person.select("first_name").execute_take_first_or_throw()
+    assert_type(plain, dict[Literal["first_name"], str])
+
+    qualified = await person.select("person.first_name").execute_take_first_or_throw()
+    assert_type(qualified, dict[Literal["first_name"], str])

@@ -136,7 +136,7 @@
     retry.hidden = true;
     try {
       const [manifestResponse, typeshedResponse] = await Promise.all([
-        fetch(new URL("intelligence/manifest.json", assets)),
+        fetch(new URL("intelligence/manifest.json?build=7", assets)),
         fetch(new URL("intelligence/typeshed-fallback.zip", assets)),
       ]);
       if (!manifestResponse.ok || !typeshedResponse.ok) throw new Error("Could not load Pyright assets");
@@ -317,6 +317,7 @@
       const examples = await Promise.all([schemaResponse.text(), queryResponse.text()]);
       const monaco = window.monaco;
       const options = { automaticLayout: true, minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false,
+        scrollbar: { alwaysConsumeMouseWheel: false },
         padding: { top: 12 }, tabSize: 4, wordWrap: "on", fixedOverflowWidgets: true,
         quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
       const models = [

@@ -40,7 +40,7 @@ joined.where("")`);
   await page.keyboard.press("Escape");
   await replaceQuery(page, `${prefix}query = db.select_from("person")
 joined = query.inner_join("pet", "person.id", "pet.owner_id")
-selected = joined.select_as("pet.name", "pet_name")
+selected = joined.select("first_name").select_as("pet.name", "pet_name")
 
 async def inspect() -> None:
     row = await selected.execute_take_first_or_throw()
@@ -49,6 +49,41 @@ async def inspect() -> None:
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Control+Space");
   await expect(page.locator(".suggest-widget.visible")).toContainText("pet_name");
+  await expect(page.locator(".suggest-widget.visible")).toContainText("first_name");
+});
+
+test("scrolls editors and passes wheel scrolling to the page at the boundary", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/playground/");
+  await expect(page.locator("#playground-query textarea")).toBeVisible();
+  await replaceQuery(page, "# scroll\n".repeat(100));
+  await page.evaluate(() => {
+    const editor = (window as any).monaco.editor.getEditors().find(
+      (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
+    );
+    editor.setScrollTop(0);
+    window.scrollTo(0, 0);
+  });
+  const bounds = (await page.locator("#playground-query").boundingBox())!;
+  expect(bounds.y + bounds.height).toBeLessThan(900);
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  const scrollTop = () => page.evaluate(() => (window as any).monaco.editor.getEditors().find(
+    (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
+  ).getScrollTop());
+  await page.mouse.wheel(0, 250);
+  await expect.poll(scrollTop).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page.mouse.wheel(0, -250);
+  await expect.poll(scrollTop).toBe(0);
+  await page.evaluate(() => {
+    const editor = (window as any).monaco.editor.getEditors().find(
+      (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
+    );
+    editor.setScrollTop(editor.getScrollHeight());
+  });
+  await expect.poll(scrollTop).toBeGreaterThan(1000);
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 });
 
 test("keeps real execution available", async ({ page }) => {

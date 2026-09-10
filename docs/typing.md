@@ -44,7 +44,7 @@ they ship, defining a schema-specific interface is a manual step.
 | Runtime schema validation | Available |
 | Column-specific comparison values | Available through the optional mypy plugin |
 | Typed string writes | Not implemented |
-| Narrow `.select()` results | Conservative; selected names remain scope-checked |
+| Narrow `.select()` results | Single literal columns retain result keys; lists and tuples use conservative types |
 | `.select_as(source, alias)` | Direct literal aliases retain key and value types |
 | Dynamic or duplicate aliases | Conservative key/value types |
 | Outer-join nullability | Not yet implemented |
@@ -100,6 +100,10 @@ source type and result key.
 - Direct literal aliases retain key completion and value information.
 - Dynamic or conflicting aliases use conservative result types.
 - The single-string form compiles at runtime without the same static inference.
+
+Results are dictionaries: use `row["first_name"]` for field access and key
+completion. Dot access such as `row.first_name` is not supported. When selected
+columns have different value types, the dictionary value type is their union.
 
 The browser [playground](playground.md) runs Pysely for query compilation and
 Pyright for editor intelligence.
