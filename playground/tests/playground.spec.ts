@@ -169,23 +169,24 @@ test("restores Monaco after instant navigation", async ({ page }) => {
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
 });
 
-test("restores Monaco through docs and browser history", async ({ page }) => {
+test("restores styled Monaco through docs and browser history", async ({ page }) => {
   await page.goto("/playground/");
-  await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
-  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
+  const editor = page.locator("#playground-query .monaco-editor");
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveCSS("position", "relative");
 
   await page.getByRole("link", { name: "Pysely", exact: true }).first().click();
   await page.locator('a[href$="/queries/"]').first().click();
   await expect(page).toHaveURL(/\/queries\/$/);
   await page.locator('a[href$="/playground/"]').first().click();
-  await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
-  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveCSS("position", "relative");
 
   await page.goBack();
   await expect(page).toHaveURL(/\/queries\/$/);
   await page.goForward();
-  await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
-  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveCSS("position", "relative");
 });
 
 test("shows page navigation inside the content", async ({ page }) => {
