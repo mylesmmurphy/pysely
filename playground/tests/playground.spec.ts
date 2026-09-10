@@ -55,7 +55,7 @@ async def inspect() -> None:
 test("scrolls editors and passes wheel scrolling to the page at the boundary", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/playground/");
-  await expect(page.locator("#playground-query textarea")).toBeVisible();
+  await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
   await replaceQuery(page, "# scroll\n".repeat(100));
   await page.evaluate(() => {
     const editor = (window as any).monaco.editor.getEditors().find(
