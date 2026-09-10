@@ -7,8 +7,8 @@ Pysely is under active development and is not production-ready.
 - Immutable query nodes and builders
 - Annotated database schemas and string-based reads and writes
 - Optional mypy plugin for literal string queries, scope checks, and projected rows
-- Portable generated-client foundation with real Pyright language-server tests
-- Three-pane Monaco playground running Pysely and upstream Pyright in browser workers
+- Schema-specific typing foundation for standard Python editors
+- Three-pane playground with Pysely compilation and Pyright language intelligence
 - PostgreSQL, MySQL, and SQLite compilation and async execution
 - Select, insert, update, and delete
 - Bound predicates, aliases, returning projections, and result metadata

@@ -20,8 +20,9 @@ Use `execute_take_first()` when zero or one row is expected, or
 
 These queries use the schema passed as `schema=Database`; see
 [Schema and typing](typing.md). Ambiguous columns must be qualified with their
-table or alias. The remaining examples below document the earlier object-based
-expression API. String writes use the same database schema and query compiler.
+table or alias. The object-based expression API remains available for queries that
+use table and column objects. String writes use the same database schema and query
+compiler.
 
 ### Portable typed aliases
 

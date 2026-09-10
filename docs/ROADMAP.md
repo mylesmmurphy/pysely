@@ -1,19 +1,16 @@
 # Implementation roadmap
 
-Editor parity is a requirement: the playground must use the public Python types
-and unmodified stock language-server results, matching VS Code with equivalent
-settings. Improvements belong in the typing contract or upstream checker. Track
-failed-overload recovery using the [diagnostic investigation](adr/0004-diagnostic-recovery.md);
-do not conceal its limitations in the browser.
+The playground uses the public Python types and stock language-server results.
+It should match VS Code with equivalent settings. See [Project status](project-status.md)
+for currently available features.
 
 ## Stage 1: Foundations
 
-- Package, CI, parity ledger, and decision records.
-- Immutable AST, visitor/transformer, catalog types, and generated fixture.
-- Offline select compilation and portable typing checks.
+- Package and CI
+- Immutable query tree and catalog types
+- Select compilation and portable typing
 
-Exit: package builds, AST branches remain independent, compiler tests pass for all
-binding profiles, and the generated fixture passes mypy and Pyright.
+Status: complete.
 
 ## Stage 2: Execution
 
@@ -21,8 +18,7 @@ binding profiles, and the generated fixture passes mypy and Pyright.
 - Async execution, resource providers, transactions, savepoints, and cleanup.
 - PostgreSQL and MySQL adapters with live CI wiring.
 
-Exit: parameterized queries and transaction failure paths pass against PostgreSQL,
-MySQL, and SQLite.
+Status: complete for PostgreSQL, MySQL, and SQLite.
 
 ## Stage 3: SQL surface
 
@@ -33,7 +29,7 @@ MySQL, and SQLite.
 - Generated schema-specific clients using standard literals, overloads, and generic
   scope, with optional enhanced mypy inference kept separate.
 
-Exit: every applicable upstream behavior has runtime, compiler, and typing evidence.
+Status: in progress.
 
 ## Stage 4: Database lifecycle
 
@@ -58,7 +54,7 @@ rolled back against a real database.
   Python or dialect differences in the parity ledger.
 - Close the parity ledger and production release gates.
 
-Exit: all release acceptance criteria in the architecture handoff are evidenced.
+Status: planned.
 
 ## Standard editor verification
 

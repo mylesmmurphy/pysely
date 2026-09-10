@@ -1,8 +1,8 @@
 # Schema and typing
 
-Pysely's baseline typing target is ordinary Python tooling: generated schema
-interfaces, standard annotations, and no required checker plugin. VS Code with
-Pylance is the primary target; PyCharm remains unverified.
+Pysely's baseline typing target is ordinary Python tooling: annotated schemas,
+standard annotations, and no required checker plugin. VS Code with Pylance is the
+primary target.
 
 The current runtime schema remains simple:
 
@@ -20,32 +20,31 @@ db = Pysely(schema=Database, dialect=PostgresDialect(pool=pool))
 rows = await db.select_from("person").select(["id", "first_name"]).execute()
 ```
 
-This form validates names at runtime. Until schema code generation ships, its
-portable result type remains the conservative `dict[str, object]`.
+This form validates names at runtime. Its portable result type is the conservative
+`dict[str, object]`.
 
-## Generated interfaces
+## Schema-specific interfaces
 
-The generated client design now uses `Literal` names, overloads, and generic query
-scope. A permanent fixture verifies that standard Pyright can suggest tables,
-suggest only columns currently in scope, add columns after a join, and reject
-out-of-scope names. The same query still executes through the normal Pysely runtime.
+Schema-specific interfaces use `Literal` names, overloads, and generic query scope.
+They support table and in-scope column completion, reject invalid names, and execute
+through the standard Pysely runtime.
 
-Database introspection and the `pysely codegen` command are not implemented yet.
-They are the next step needed to make this generated interface the normal workflow.
+Database introspection and the `pysely codegen` command are not implemented. Until
+they ship, defining a schema-specific interface is a manual step.
 
-| Capability | Portable status |
+| Capability | Status |
 | --- | --- |
-| Table-name completion | Verified with Pyright language server 1.1.413 |
-| Columns before and after inner joins | Verified with Pyright language server 1.1.413 |
-| Invalid and unjoined columns | Verified with Pyright 1.1.413 |
-| Runtime schema validation | Verified |
-| Column-specific comparison values | Limited to the optional mypy plugin |
-| Typed string writes | Planned for generated interfaces |
+| Table-name completion | Available in schema-specific interfaces |
+| Columns before and after inner joins | Available in schema-specific interfaces |
+| Invalid and unjoined columns | Rejected in schema-specific interfaces |
+| Runtime schema validation | Available |
+| Column-specific comparison values | Available through the optional mypy plugin |
+| Typed string writes | Not implemented |
 | Narrow `.select()` results | Conservative; selected names remain scope-checked |
-| `.select_as(source, alias)` | Verified with stock Pyright and mypy for direct literal aliases |
+| `.select_as(source, alias)` | Direct literal aliases retain key and value types |
 | Dynamic or duplicate aliases | Conservative key/value types |
 | Outer-join nullability | Not yet implemented |
-| PyCharm behavior | Unverified |
+| PyCharm support | Not documented |
 
 Chained `.select_as()` calls accumulate literal result keys without a fixed
 projection-count limit. When aliases select different value types, the mapping's
@@ -61,9 +60,8 @@ non-overloaded methods. Invalid columns in ordinary `where` and `select` calls
 already receive argument-sized diagnostics; failed overloads can additionally
 cause unknown-type errors in later calls.
 
-The [diagnostic investigation](adr/0004-diagnostic-recovery.md) records the tested
-alternatives. Fluent chaining is the intended API. The playground displays the
-original checker diagnostics and does not add execution errors as editor markers.
+Fluent chaining is the intended API. The playground forwards language-server
+diagnostics and does not add execution errors as editor markers.
 
 For a temporarily tighter diagnostic range, the same builder can be written as
 separate calls while locating an error:

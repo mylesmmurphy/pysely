@@ -124,7 +124,7 @@ Use Python **3.11+** as the initial compatibility floor, conventional `TypeVar`/
 | `test/property/`, `test/benchmarks/` | Generated invariants and performance |
 | `test/fixtures/`, `test/conftest.py` | Schemas, shared records, dialect parametrization |
 | `docs/`, `example/`, `scripts/`, `.github/workflows/` | Documentation, runnable examples, tooling, CI |
-| `docs/adr/`, `docs/parity/`, `docs/handoff/` | Decisions, parity evidence, continuation state |
+| `docs/adr/`, `docs/parity/`, `internal/handoff/` | Decisions, parity evidence, continuation state |
 
 Retain Kysely's singular `test/` and `example/` where convenient. Replace hyphenated TypeScript filenames with snake_case. Group tiny related AST definitions if Python import costs justify it; preserve recognizable concepts and source mappings.
 
@@ -527,7 +527,7 @@ Typing and runtime tests accompany every feature rather than being postponed to 
 
 ### 12.1 First agent session: concrete tasks
 
-1. Inspect the destination repository and applicable local instructions. Preserve existing work. Create the project if absent and copy this handoff into `docs/handoff/architecture.md`.
+1. Inspect the destination repository and applicable local instructions. Preserve existing work. Create the project if absent and copy this handoff into `internal/handoff/architecture.md`.
 2. Fetch the pinned Kysely snapshot into a reference-only location. Record its hash/version in `docs/parity/upstream.json`; do not ship its checkout in the Python wheel.
 3. Inventory all public exports and runtime/type cases, including nested test names and dialect exclusions. Use parsing or careful manual verification; regex title counts alone are not a complete inventory.
 4. Set up uv, pyproject, lockfile, Ruff, pytest, mypy/Pyright, docs, and CI service definitions. Add real package import/build tests.
@@ -565,7 +565,7 @@ Escalate only material scope changes or evidence that the typing goals cannot be
 
 ## 14. Continuation record template
 
-Keep `docs/handoff/STATUS.md` current with:
+Keep `internal/handoff/STATUS.md` current with:
 
 ```markdown
 # Pysely implementation status
