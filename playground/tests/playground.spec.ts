@@ -108,22 +108,11 @@ test("hands scrolling to the page on the next gesture at the editor boundary", a
     const editor = (window as any).monaco.editor.getEditors().find(
       (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
     );
-    const element = editor.getDomNode();
-    element.dispatchEvent(new WheelEvent("wheel", { deltaY: 10000, bubbles: true, cancelable: true }));
-    element.dispatchEvent(new WheelEvent("wheel", { deltaY: 500, bubbles: true, cancelable: true }));
+    editor.setScrollTop(editor.getScrollHeight());
   });
   await expect.poll(scrollTop).toBeGreaterThan(1000);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  await page.waitForTimeout(100);
-  await page.evaluate(() => {
-    const editor = (window as any).monaco.editor.getEditors().find(
-      (editor: any) => editor.getModel()?.uri.path === "/workspace/query.py",
-    );
-    const element = editor.getDomNode();
-    for (const deltaY of [1, 100, 400]) {
-      element.dispatchEvent(new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true }));
-    }
-  });
+  await page.mouse.wheel(0, 400);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(50);
 });
 
@@ -169,7 +158,11 @@ test("separates playground at the bottom of the docs navigation", async ({ page 
   expect(await playground.evaluate(item => getComputedStyle(item).borderTopStyle)).toBe("solid");
 });
 
-test("restores Monaco after instant navigation", async ({ page }) => {
+test("reloads styled Monaco after leaving the playground", async ({ page }) => {
+  let playgroundLoads = 0;
+  page.on("request", request => {
+    if (new URL(request.url()).pathname === "/playground/" && request.isNavigationRequest()) playgroundLoads += 1;
+  });
   await page.goto("/playground/");
   await expect(page.locator("#playground-query .monaco-editor")).toBeVisible();
   await page.getByRole("link", { name: "Pysely", exact: true }).first().click();
@@ -178,6 +171,8 @@ test("restores Monaco after instant navigation", async ({ page }) => {
   const editor = page.locator("#playground-query .monaco-editor");
   await expect(editor).toBeVisible();
   await expect(editor).toHaveCSS("position", "relative");
+  await expect(editor.locator("textarea.inputarea")).toHaveCSS("position", "absolute");
+  await expect.poll(() => playgroundLoads).toBe(2);
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
 });
 
