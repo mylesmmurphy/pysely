@@ -379,17 +379,27 @@
       // the viewer is static highlighted HTML, not a fourth editor, so it costs
       // nothing while scrolling.
       const generatedModel = monaco.editor.createModel("# Run to generate database.py", "python", generatedUri);
-      const generatedDetails = root.querySelector("#playground-generated");
+      const generatedView = root.querySelector("#playground-generated");
       const generatedCode = root.querySelector("#playground-generated-code");
       let renderedGenerated;
       const showGenerated = () => {
-        if (!generatedDetails.open) return;
+        if (generatedView.hidden) return;
         const text = generatedModel.getValue();
         if (renderedGenerated === text) return;
         renderedGenerated = text;
         renderCode(generatedCode, text, "python");
       };
-      generatedDetails.addEventListener("toggle", showGenerated);
+      // Output tabs: compiled SQL, or the generated module.
+      const tabs = [...root.querySelectorAll(".pysely-tab")];
+      const selectTab = tab => {
+        for (const item of tabs) {
+          const selected = item === tab;
+          item.setAttribute("aria-selected", String(selected));
+          root.querySelector(`#${item.getAttribute("aria-controls")}`).hidden = !selected;
+        }
+        showGenerated();
+      };
+      tabs.forEach(tab => tab.addEventListener("click", () => selectTab(tab)));
       for (const name of ["schema", "query"]) root.querySelector(`#playground-${name}`).textContent = "";
       const editors = ["schema", "query"].map((name, index) => monaco.editor.create(
         root.querySelector(`#playground-${name}`), { ...options, model: models[index], ariaLabel: `${name} editor` },
@@ -399,9 +409,11 @@
           root.style.removeProperty("--pysely-editor-height");
           return;
         }
-        const top = root.querySelector("#playground-query").getBoundingClientRect().top;
-        const footerHeight = root.querySelector(".pysely-playground__footer").getBoundingClientRect().height;
-        const height = Math.max(260, Math.min(640, window.innerHeight - top - footerHeight - 16));
+        // Size the editors so the whole workbench ends at the bottom of the viewport.
+        const workbench = root.getBoundingClientRect();
+        const editorHeight = root.querySelector("#playground-query").getBoundingClientRect().height;
+        const chrome = workbench.height - editorHeight;
+        const height = Math.max(260, window.innerHeight - workbench.top - chrome - 16);
         root.style.setProperty("--pysely-editor-height", `${height}px`);
       };
       fitEditors();
@@ -518,7 +530,7 @@
           .catch(failure => { console.error("Could not start Pyright", failure); });
       };
       intelligenceRetry.onclick = loadIntelligence;
-      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; generatedDetails.removeEventListener("toggle", showGenerated); generatedModel.dispose(); observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; generatedModel.dispose(); observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
       setTimeout(() => loadIntelligence().finally(run), 500);
     } catch (failure) {
       status.textContent = "Could not load playground";
