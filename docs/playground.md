@@ -20,19 +20,20 @@ hide:
     <button id="playground-intelligence-retry" type="button" hidden>Retry suggestions</button>
     <span id="playground-status" role="status" aria-busy="true">Loading editors</span>
   </div>
-  <p class="pysely-playground__pipeline">Edit <code>schema.py</code> → the playground runs <code>pysely codegen</code> → <code>database.py</code> is regenerated → <code>query.py</code> is checked against it. Nothing here is hand-written except the two editors.</p>
   <div class="pysely-playground__panes">
     <section><h2>Database <small>schema.py · regenerates database.py</small></h2><div id="playground-schema" class="pysely-editor"><span class="pysely-editor__loading">Loading schema editor</span></div></section>
     <section><h2>Query <small>query.py</small></h2><div id="playground-query" class="pysely-editor"><span class="pysely-editor__loading">Loading query editor</span></div></section>
-    <section><h2>SQL <small>compiled</small></h2><div id="playground-sql" class="pysely-editor"><span class="pysely-editor__loading">Loading SQL editor</span></div></section>
+    <section><h2>SQL <small>compiled</small></h2><div id="playground-sql" class="pysely-editor pysely-editor--view"><span class="pysely-editor__loading">Loading SQL view</span></div></section>
   </div>
-  <div class="pysely-playground__parameters"><span>Parameters</span><code id="playground-parameters">[]</code></div>
+  <div class="pysely-playground__footer">
+    <div class="pysely-playground__parameters"><span>Parameters</span><code id="playground-parameters">[]</code></div>
+    <p class="pysely-playground__pipeline">Edit <code>schema.py</code> → the playground runs <code>pysely codegen</code> → <code>database.py</code> is regenerated → <code>query.py</code> is checked against it. Nothing here is hand-written except the two editors.</p>
+    <details id="playground-generated" class="pysely-playground__generated">
+      <summary>View generated code · <code>database.py</code></summary>
+      <pre id="playground-generated-code" class="monaco-editor pysely-code pysely-code--generated" aria-label="generated database.py"></pre>
+    </details>
+  </div>
   <pre id="playground-error" role="alert" hidden></pre>
-  <details id="playground-generated" class="pysely-playground__generated">
-    <summary>View generated code · <code>database.py</code></summary>
-    <p>Written by <code>pysely codegen</code> from the schema above. Read-only; it is regenerated on every run.</p>
-    <div id="playground-generated-editor" class="pysely-editor pysely-editor--generated"></div>
-  </details>
 </div>
 
 - Run compiles a query in your browser with the selected dialect. No database

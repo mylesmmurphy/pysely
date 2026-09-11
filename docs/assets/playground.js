@@ -151,6 +151,21 @@
 
   const markdown = value => typeof value === "string" ? value : value?.value || "";
 
+  // Read-only views are static HTML, not editors: Monaco tokenizes once and we
+  // lay the lines out with numbers. Token colors come from the active Monaco
+  // theme, which scopes its rules under .monaco-editor.
+  const renderCode = (element, text, language) => {
+    const token = (element.dataset.render = String(Number(element.dataset.render || 0) + 1));
+    return window.monaco.editor.colorize(text, language, { tabSize: 4 }).then(html => {
+      if (element.dataset.render !== token) return;
+      const lines = html.split(/<br\s*\/?>/);
+      if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+      element.innerHTML = lines.map((line, index) =>
+        `<div class="pysely-code__line"><span class="pysely-code__number">${index + 1}</span><span class="pysely-code__text">${line || " "}</span></div>`,
+      ).join("");
+    });
+  };
+
   async function startIntelligence(monaco, models, status, retry) {
     const startedAt = performance.now();
     let client;
@@ -352,22 +367,32 @@
       const models = [
         monaco.editor.createModel(examples[0], "python", schemaUri),
         monaco.editor.createModel(examples[1], "python", queryUri),
-        monaco.editor.createModel("", "sql"),
       ];
-      // The generated module, shown read-only under "View generated code".
+      const sqlView = root.querySelector("#playground-sql");
+      sqlView.textContent = "";
+      const sqlCode = document.createElement("pre");
+      sqlCode.className = "monaco-editor pysely-code";
+      sqlCode.setAttribute("aria-label", "compiled SQL");
+      sqlView.append(sqlCode);
+      const showSql = text => renderCode(sqlCode, text, "sql");
+      // The generated module. The model backs go-to-definition and diagnostics;
+      // the viewer is static highlighted HTML, not a fourth editor, so it costs
+      // nothing while scrolling.
       const generatedModel = monaco.editor.createModel("# Run to generate database.py", "python", generatedUri);
       const generatedDetails = root.querySelector("#playground-generated");
-      let generatedEditor;
+      const generatedCode = root.querySelector("#playground-generated-code");
+      let renderedGenerated;
       const showGenerated = () => {
-        if (!generatedDetails.open || generatedEditor) return;
-        generatedEditor = monaco.editor.create(root.querySelector("#playground-generated-editor"), {
-          ...options, model: generatedModel, readOnly: true, ariaLabel: "generated database.py",
-        });
+        if (!generatedDetails.open) return;
+        const text = generatedModel.getValue();
+        if (renderedGenerated === text) return;
+        renderedGenerated = text;
+        renderCode(generatedCode, text, "python");
       };
       generatedDetails.addEventListener("toggle", showGenerated);
-      for (const name of ["schema", "query", "sql"]) root.querySelector(`#playground-${name}`).textContent = "";
-      const editors = ["schema", "query", "sql"].map((name, index) => monaco.editor.create(
-        root.querySelector(`#playground-${name}`), { ...options, model: models[index], readOnly: index === 2, ariaLabel: `${name} editor` },
+      for (const name of ["schema", "query"]) root.querySelector(`#playground-${name}`).textContent = "";
+      const editors = ["schema", "query"].map((name, index) => monaco.editor.create(
+        root.querySelector(`#playground-${name}`), { ...options, model: models[index], ariaLabel: `${name} editor` },
       ));
       const fitEditors = () => {
         if (window.innerWidth <= 1000) {
@@ -375,8 +400,8 @@
           return;
         }
         const top = root.querySelector("#playground-query").getBoundingClientRect().top;
-        const parametersHeight = root.querySelector(".pysely-playground__parameters").getBoundingClientRect().height;
-        const height = Math.max(260, Math.min(640, window.innerHeight - top - parametersHeight - 16));
+        const footerHeight = root.querySelector(".pysely-playground__footer").getBoundingClientRect().height;
+        const height = Math.max(260, Math.min(640, window.innerHeight - top - footerHeight - 16));
         root.style.setProperty("--pysely-editor-height", `${height}px`);
       };
       fitEditors();
@@ -424,7 +449,7 @@
               const changed = data.database !== generated;
               generated = data.database;
               pushGenerated(generated);
-              if (changed) generatedModel.setValue(generated);
+              if (changed) { generatedModel.setValue(generated); showGenerated(); }
               codegenStatus.textContent = first
                 ? "database.py: generated from schema.py"
                 : changed ? "database.py: regenerated from schema.py" : "database.py: up to date";
@@ -436,13 +461,13 @@
               status.textContent = "Check your code";
               error.textContent = data.error;
               error.hidden = false;
-              models[2].setValue("-- Fix the error to compile this query.");
+              showSql("-- Fix the error to compile this query.");
               root.querySelector("#playground-parameters").textContent = "[]";
             } else {
               status.textContent = "Compiled";
               error.textContent = "";
               error.hidden = true;
-              models[2].setValue(data.sql);
+              showSql(data.sql);
               root.querySelector("#playground-parameters").textContent = JSON.stringify(data.parameters);
             }
             if (pending) { pending = false; run(); }
@@ -493,7 +518,7 @@
           .catch(failure => { console.error("Could not start Pyright", failure); });
       };
       intelligenceRetry.onclick = loadIntelligence;
-      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; generatedDetails.removeEventListener("toggle", showGenerated); generatedEditor?.dispose(); generatedModel.dispose(); observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; generatedDetails.removeEventListener("toggle", showGenerated); generatedModel.dispose(); observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
       setTimeout(() => loadIntelligence().finally(run), 500);
     } catch (failure) {
       status.textContent = "Could not load playground";

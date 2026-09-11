@@ -15,7 +15,6 @@ body:has(.pysely-playground) .md-content { min-width: 0; }
 #playground-status { font-size: 13px; }
 #playground-codegen-status { font-size: 13px; opacity: .8; }
 #playground-codegen-status[data-fresh] { opacity: 1; font-weight: 600; }
-.pysely-playground__pipeline { margin: 8px 16px 0; font-size: 13px; opacity: .8; }
 .pysely-playground [aria-busy="true"]::before,
 .pysely-editor__loading::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -2px; animation: pysely-spin .8s linear infinite; }
 @keyframes pysely-spin { to { transform: rotate(360deg); } }
@@ -32,10 +31,19 @@ body:has(.pysely-playground) .md-content { min-width: 0; }
 .pysely-editor__loading { position: absolute; inset: 0; padding: 14px 16px; background: var(--md-code-bg-color); color: var(--md-code-fg-color); font-family: var(--md-code-font-family); font-size: 14px; }
 .pysely-playground__parameters { display: flex; gap: 16px; padding: 12px 16px; border-top: 1px solid var(--md-default-fg-color--lightest); font-size: 13px; }
 .pysely-playground__parameters code { white-space: pre-wrap; }
-.pysely-playground__generated { border-top: 1px solid var(--md-default-fg-color--lightest); padding: 8px 16px 12px; font-size: 13px; }
+.pysely-playground__footer { border-top: 1px solid var(--md-default-fg-color--lightest); }
+.pysely-playground__footer .pysely-playground__parameters { border-top: 0; padding-bottom: 6px; }
+.pysely-playground__pipeline { margin: 0; padding: 0 16px 8px; font-size: 13px; opacity: .8; }
+.pysely-playground__generated { padding: 0 16px 12px; font-size: 13px; }
 .pysely-playground__generated summary { cursor: pointer; font-weight: 600; }
-.pysely-playground__generated p { margin: 6px 0 8px; opacity: .8; }
-.pysely-editor--generated { height: 420px; border: 1px solid var(--md-default-fg-color--lightest); }
+/* Static code views. `.monaco-editor` scopes the theme's token colors; the rest matches the editors' text metrics. */
+.pysely-code { margin: 0; padding: 12px 0; overflow: auto; white-space: pre; font-family: Menlo, Monaco, "Courier New", monospace; font-size: 14px; line-height: 19px; tab-size: 4; }
+.pysely-code.monaco-editor { position: static; width: auto; height: auto; outline: none; box-shadow: none; font-family: Menlo, Monaco, "Courier New", monospace; }
+.pysely-editor--view .pysely-code { height: 100%; box-sizing: border-box; }
+.pysely-code__line { display: flex; min-height: 19px; }
+.pysely-code__number { flex: 0 0 3.5em; padding-right: 1.4em; text-align: right; opacity: .45; user-select: none; }
+.pysely-code__text { flex: 1; padding-right: 16px; }
+.pysely-code--generated { margin-top: 8px; max-height: 420px; border: 1px solid var(--md-default-fg-color--lightest); border-radius: 4px; }
 #playground-error { margin: 0; padding: 16px; white-space: pre-wrap; color: var(--md-typeset-a-color); }
 #playground-error[hidden] { display: none; }
 @media (max-width: 1000px) {
