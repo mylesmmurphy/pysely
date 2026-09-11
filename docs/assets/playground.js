@@ -158,7 +158,9 @@
     const token = (element.dataset.render = String(Number(element.dataset.render || 0) + 1));
     return window.monaco.editor.colorize(text, language, { tabSize: 4 }).then(html => {
       if (element.dataset.render !== token) return;
-      const lines = html.split(/<br\s*\/?>/);
+      // Monaco emits non-breaking spaces; pre-wrap keeps plain ones and can
+      // wrap on them, so long lines break between words, not inside them.
+      const lines = html.replace(/&nbsp;|\u00a0/g, " ").split(/<br\s*\/?>/);
       if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
       element.innerHTML = lines.map((line, index) =>
         `<div class="pysely-code__line"><span class="pysely-code__number">${index + 1}</span><span class="pysely-code__text">${line || " "}</span></div>`,

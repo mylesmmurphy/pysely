@@ -291,6 +291,10 @@ test("shows the generated module in an output tab", async ({ page }) => {
   await page.locator("#playground-tab-sql").click();
   await expect(page.locator("#playground-sql")).toBeVisible();
   expect(await page.locator("#playground-sql [class^=mtk]").count()).toBeGreaterThan(3);
+  // Long lines wrap between words: Monaco's non-breaking spaces are replaced.
+  expect(await page.locator("#playground-sql .pysely-code__text").first().textContent()).not.toContain("\u00a0");
+  const sqlView = page.locator("#playground-sql .pysely-code");
+  expect(await sqlView.evaluate(view => view.scrollWidth <= view.clientWidth)).toBe(true);
 });
 
 test("fits the workbench to the viewport", async ({ page }) => {

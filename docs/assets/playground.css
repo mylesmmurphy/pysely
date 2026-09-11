@@ -36,10 +36,10 @@ body:has(.pysely-playground) .md-content { min-width: 0; }
 .pysely-tab[aria-selected="true"] { border-bottom-color: var(--md-accent-fg-color, currentColor); }
 .pysely-tab small { float: none; margin-left: 6px; }
 /* Static code views. `.monaco-editor` scopes the theme's token colors; the rest matches the editors' text metrics. */
-.pysely-code.monaco-editor { position: static; display: block; width: auto; height: 100%; box-sizing: border-box; margin: 0; padding: 12px 0; overflow-y: auto; overflow-x: hidden; outline: none; box-shadow: none; white-space: pre-wrap; overflow-wrap: anywhere; font-family: Menlo, Monaco, "Courier New", monospace; font-size: 14px; line-height: 19px; tab-size: 4; }
+.pysely-code.monaco-editor { position: static; display: block; width: auto; height: 100%; box-sizing: border-box; margin: 0; padding: 12px 0; overflow-y: auto; overflow-x: hidden; outline: none; box-shadow: none; white-space: pre-wrap; overflow-wrap: break-word; font-family: Menlo, Monaco, "Courier New", monospace; font-size: 14px; line-height: 19px; tab-size: 4; }
 .pysely-code__line { display: flex; min-height: 19px; }
 .pysely-code__number { flex: 0 0 3.5em; padding-right: 1.4em; text-align: right; opacity: .45; user-select: none; }
-.pysely-code__text { flex: 1; min-width: 0; padding-right: 16px; }
+.pysely-code__text { flex: 1; min-width: 0; padding-right: 16px; padding-left: 4ch; text-indent: -4ch; }
 #playground-error { margin: 0; padding: 16px; white-space: pre-wrap; color: var(--md-typeset-a-color); }
 #playground-error[hidden] { display: none; }
 @media (max-width: 1000px) {

@@ -81,7 +81,11 @@ unknown tables, unknown or unjoined columns, and values of the wrong type.
 ## Rules worth knowing
 
 - **Chain `.select()` per column** for typed result keys.
-  `.select(["a", "b"])` compiles but types rows as `dict[str, object]`.
+  `.select(["a", "b"])` compiles but types rows as `dict[str, object]`:
+  mypy reads a list literal as `list[str]`, so its keys cannot be captured.
+- **Chained-call errors underline the whole chain.** Every typed method is an
+  overload set, and checkers report "No overloads match" on the full call
+  expression. The argument-level detail is in the same diagnostic.
 - **Qualify shared column names.** If `id` exists on two tables, write
   `person.id`, even in a single-table query. The runtime is more lenient; the
   checker cannot see query scope.
