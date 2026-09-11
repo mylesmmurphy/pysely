@@ -40,7 +40,8 @@ editor error.
 ## Static checking
 
 Static checking comes from [code generation](codegen.md). The generator reads
-the classes above and writes the literal types a checker needs:
+the classes above and writes one self-contained module carrying those classes
+and the literal types a checker needs:
 
 ```bash
 pysely codegen schema.py --output db.py
@@ -69,15 +70,22 @@ With the generated module in place:
 | Column completion before and after inner joins | Available |
 | Invalid and unjoined columns | Rejected |
 | `.where()` comparison values | Checked against the column type |
-| Result keys from `.select()` and `.select_as()` | Literal keys retained |
+| Result keys from chained `.select()` and `.select_as()` | Literal keys retained |
+| Result keys from `.select([...])` lists and tuples | Conservative `dict[str, object]` |
 | Runtime schema validation | Available, with or without generation |
 | Typed string writes | Not implemented |
 | Outer-join nullability | Not implemented |
 | PyCharm support | Not verified |
 
-Chained `.select_as()` calls retain literal result keys without a fixed
-projection limit. Dynamic aliases and duplicate aliases fall back to a broader
-mapping type.
+Chain one `.select()` or `.select_as()` per column to keep result keys typed;
+there is no fixed projection limit. Dynamic aliases and duplicate aliases fall
+back to a broader mapping type.
+
+A bare column name is generated only when it is unique across the whole schema.
+If `id` exists on both `person` and `pet`, write `person.id` even in a query
+that only touches `person`. The runtime is more lenient — it resolves a bare
+name whenever it is unique in the current query scope — but a checker cannot
+see scope, so the static rule is stricter to stay sound.
 
 ## Why generation rather than a plugin
 

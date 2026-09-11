@@ -32,6 +32,13 @@ The generator parses the schema module with `ast`. It does not import it,
 execute it, or connect to a database. Its output is committed so editors need no
 build step, and `--check` gates drift in CI and in a pre-commit hook.
 
+The output is one self-contained module. It re-emits the schema classes
+alongside the typed interface rather than importing them, so an application
+depends on a single generated file and the schema module's location is
+irrelevant at runtime. A future `pysely introspect` will write the same module
+directly from a live database. The schema may not define `Database` or
+`DatabaseQuery`, which the generated module reserves for itself.
+
 ## Consequences
 
 One implementation serves mypy and Pyright. The schema module is the single

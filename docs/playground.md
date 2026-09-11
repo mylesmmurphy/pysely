@@ -30,10 +30,11 @@ hide:
 
 - Run compiles a query in your browser with the selected dialect. No database
   connection is required.
-- Editing the schema runs `pysely codegen` in the browser and hands the result
-  to Pyright, so completions and errors always match the schema on screen. The
-  generated interface is not shown, but it is the same file the
-  [codegen guide](codegen.md) describes and nothing else supplies the types.
+- Editing the schema runs `pysely codegen` in the browser and hands the
+  generated module to Pyright, so completions and errors always match the schema
+  on screen. That module is not shown, but it is exactly what
+  `pysely codegen schema.py --output database.py` writes, and nothing else
+  supplies the types.
 - `run_query` demonstrates the typed execution result. The playground does not
   invoke it.
 - Suggestions, type information, and diagnostics come from Pyright in a browser

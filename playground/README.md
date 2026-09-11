@@ -7,7 +7,9 @@ same example against the real Pysely package.
 ## Generated interface
 
 The typed interface the editor checks against is produced by `pysely codegen`
-from the schema editor's contents, not baked in at build time. The Pyodide
+from the schema editor's contents, not baked in at build time. It is one
+self-contained module: it carries a copy of the schema classes and does not
+import `schema.py`. The Pyodide
 worker regenerates it on every run and the result is pushed to Pyright as
 `workspace/database.py`, so a column added in the schema pane is immediately
 usable in the query pane. `scripts/build-assets.mjs` bakes the committed

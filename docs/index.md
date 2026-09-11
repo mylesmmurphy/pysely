@@ -12,11 +12,16 @@ types, and parameterized SQL without hiding the SQL you write.
 ```python
 rows = await (
     db.select_from("person")
-    .select(["id", "first_name"])
+    .select("id")
+    .select("first_name")
     .where("first_name", "=", "Jennifer")
     .execute()
 )
 ```
+
+Table, column, and value types come from one generated module built from your
+annotated schema classes — `pysely codegen schema.py --output db.py` — and are
+checked by mypy and Pyright with no plugin. See [Code generation](codegen.md).
 
 ## Current database support
 

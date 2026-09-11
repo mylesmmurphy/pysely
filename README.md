@@ -13,24 +13,25 @@ Insert, update, and delete builders support bound values and returning projectio
 ```python
 query = (
     db.select_from("person")
-    .select(["id", "first_name"])
+    .select("id")
+    .select("first_name")
     .where("first_name", "=", "Jennifer")
 )
 
 compiled = query.compile()
 ```
 
-Annotated schema classes validate table and column names at runtime. For static
-checking in mypy and Pyright, generate a typed interface from the same classes:
+Define your tables as annotated classes, then generate one self-contained
+module that gives mypy and Pyright every table, column, and value type:
 
 ```bash
 pysely codegen schema.py --output db.py
 ```
 
-Python has no `keyof` or mapped types, so the literal column names have to exist
-in real annotations for a checker to see them. Generation writes them once and
-serves both checkers; no checker plugin is required. See
-[Code generation](https://pysely.dev/codegen/).
+Import `Database` from `db.py` and nothing else. Python has no `keyof` or
+mapped types, so the literal column names have to exist in real annotations for
+a checker to see them; generation writes them once and serves both checkers with
+no plugin. See [Code generation](https://pysely.dev/codegen/).
 
 Install the development release with the driver extra for your database:
 

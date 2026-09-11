@@ -19,7 +19,7 @@ def _codegen(arguments: argparse.Namespace) -> int:
         print(f"pysely: cannot read {schema}: {error}", file=sys.stderr)
         return 2
     try:
-        generated = generate(source, source_name=schema.name, output=str(output))
+        generated = generate(source, source_name=str(schema), output=str(output))
     except (SchemaError, SyntaxError) as error:
         print(f"pysely: {schema}: {error}", file=sys.stderr)
         return 2
@@ -47,7 +47,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     codegen = commands.add_parser(
         "codegen",
-        help="generate a typed query interface from annotated schema classes",
+        help=(
+            "write one self-contained module with a typed query interface built "
+            "from annotated schema classes"
+        ),
     )
     codegen.add_argument("schema", type=Path, help="module containing schema classes")
     codegen.add_argument(
@@ -55,7 +58,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--output",
         type=Path,
         required=True,
-        help="file to write the generated interface to",
+        help="module to write; import Database from it and nothing else",
     )
     codegen.add_argument(
         "--check",

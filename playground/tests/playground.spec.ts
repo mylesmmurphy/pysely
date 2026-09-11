@@ -257,10 +257,15 @@ test("regenerates the typed interface from the schema editor", async ({ page }) 
   await page.evaluate(code => {
     const monaco = (window as any).monaco;
     monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
-  }, `${prefix}compiled = db.select_from("person").select("nickname").compile()`);
+  }, `from database import Database
+from playground import dialect
 
-  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
-  await expect(page.locator("#playground-sql")).toContainText('select "nickname"');
+db = Database(dialect=dialect)
+compiled = db.select_from("person").select("nickname").compile()
+`);
+
+  await expect(page.locator("#playground-sql")).toContainText('select "nickname"', { timeout: 40_000 });
+  await expect(page.locator("#playground-status")).toHaveText("Compiled");
 
   const markers = () => page.evaluate(() => {
     const monaco = (window as any).monaco;

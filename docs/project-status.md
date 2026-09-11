@@ -6,7 +6,8 @@ Pysely is under active development and is not production-ready.
 
 - Immutable query nodes and builders
 - Annotated database schemas and string-based reads and writes
-- `pysely codegen` typed interfaces with a `--check` drift gate
+- `pysely codegen`: one self-contained typed module per schema, with a
+  `--check` drift gate
 - Static checking in mypy and Pyright with no checker plugin
 - Three-pane playground with Pysely compilation and Pyright language intelligence
 - PostgreSQL, MySQL, and SQLite compilation and async execution

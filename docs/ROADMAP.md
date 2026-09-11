@@ -30,7 +30,7 @@ complete. Psycopg 3 and aiomysql adapters are planned.
   columns, indexes, constraints, and schemas where the dialect supports them.
 - Capability checks and dialect helpers.
 - Generated schema-specific clients using standard literals, overloads, and generic
-  scope, with optional enhanced mypy inference kept separate.
+  scope, written by `pysely codegen` as one self-contained module.
 
 Status: in progress.
 
@@ -41,8 +41,8 @@ Status: in progress.
 - Apply schema changes through the same schema builders used outside migrations,
   including table alterations.
 - Add PostgreSQL, MySQL, and SQLite introspection.
-- Generate deterministic database and table classes from an introspected schema,
-  with a check mode that reports schema drift without rewriting files.
+- `pysely introspect`: write the same single generated module `pysely codegen`
+  produces, directly from a live database, reusing its `--check` drift mode.
 
 Exit: each primary dialect can be introspected, generated, migrated forward, and
 rolled back against a real database.

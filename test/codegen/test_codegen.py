@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import subprocess
 import sys
 from pathlib import Path
@@ -82,7 +83,7 @@ def test_generated_example_is_committed_and_current() -> None:
     """The checked-in interface must match what the generator produces."""
     expected = generate(
         EXAMPLE_SCHEMA.read_text(),
-        source_name=EXAMPLE_SCHEMA.name,
+        source_name="docs/assets/examples/schema.py",
         output="docs/assets/examples/database.py",
     )
     assert EXAMPLE_DATABASE.read_text() == expected, (
@@ -192,3 +193,44 @@ def test_cli_reports_a_bad_schema(tmp_path: Path) -> None:
     )
     assert result.returncode == 2
     assert "No database class" in result.stderr
+
+
+def test_generated_module_is_self_contained(tmp_path: Path) -> None:
+    """The output imports nothing from the schema module and runs on its own."""
+    generated = generate(SCHEMA)
+    assert "from schema import" not in generated
+    assert "class PersonTable:" in generated
+    assert "class DatabaseSchema:" in generated
+
+    module_path = tmp_path / "db.py"
+    module_path.write_text(generated)
+    from pysely import Dialect
+    from pysely.query_compiler import BindingProfile
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        module = importlib.import_module("db")
+        db = module.Database(dialect=Dialect(BindingProfile("test", "?")))
+        query = db.select_from("pet").where("species", "=", "cat").select("id")
+        compiled = query.compile()
+    finally:
+        sys.path.remove(str(tmp_path))
+        sys.modules.pop("db", None)
+
+    assert compiled.sql == 'select "id" from "pet" where "species" = ?'
+    assert compiled.parameters == ("cat",)
+
+
+def test_generated_module_merges_schema_typing_imports() -> None:
+    source = SCHEMA.replace(
+        "from typing import Literal", "from typing import Literal, TypedDict"
+    )
+    generated = generate(source)
+    assert "    TypedDict," in generated
+    assert generated.count("from typing import") == 1
+
+
+def test_rejects_schema_class_names_the_output_defines() -> None:
+    source = SCHEMA.replace("class DatabaseSchema:", "class Database:")
+    with pytest.raises(SchemaError, match="reserved.*Database"):
+        generate(source)

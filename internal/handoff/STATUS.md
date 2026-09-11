@@ -29,9 +29,10 @@ Current stage: 3 - SQL surface
 - Single-connection scopes and rollback after transaction body or commit failure.
 - Parenthesized boolean groups and basic column-reference comparisons.
 - Annotated database schemas, string read queries, inner joins, and aliases.
-- `pysely codegen` typed interfaces from annotated schema classes, with a
-  `--check` drift gate in CI and a published pre-commit hook (ADR 0006). The
-  `pysely.mypy` plugin was removed; generated source serves both checkers.
+- `pysely codegen` writes one self-contained typed module (schema classes plus
+  interface) from annotated schema classes, with a `--check` drift gate in CI
+  and a published pre-commit hook (ADR 0006). The `pysely.mypy` plugin was
+  removed; generated source serves both checkers.
 - Thread-safe query compilation: a shared compiler no longer keeps bound
   parameters on the instance across concurrent calls.
 - Portable generated-query wrapper and schema-specific fixture using standard
