@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 const prefix = `from typing import cast
-from pysely import Pysely
+from pysely import Database
 from pysely.dialect import Dialect
 from database import DatabaseSchema
 
 dialect = cast(Dialect, globals()["dialect"])
-db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=DatabaseSchema, dialect=dialect)
 `;
 
 async function replaceQuery(page: import("@playwright/test").Page, code: string) {
@@ -258,9 +258,9 @@ test("regenerates the typed interface from the schema editor", async ({ page }) 
     monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
   }, `from database import DatabaseSchema
 from playground import dialect
-from pysely import Pysely
+from pysely import Database
 
-db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=DatabaseSchema, dialect=dialect)
 compiled = db.select_from("person").select("nickname").compile()
 `);
 

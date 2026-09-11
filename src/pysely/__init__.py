@@ -17,7 +17,7 @@ from .errors import (
     UnsupportedFeatureError,
 )
 from .expression import AliasedExpression, Expression, and_, or_
-from .pysely import Pysely
+from .pysely import Database, Pysely
 from .query_builder import (
     DeleteQueryBuilder,
     DeleteResult,
@@ -40,6 +40,7 @@ __all__ = [
     "ClosedClientError",
     "Column",
     "CompiledQuery",
+    "Database",
     "DeleteQueryBuilder",
     "DeleteResult",
     "Dialect",

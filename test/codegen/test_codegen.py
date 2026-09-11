@@ -204,13 +204,13 @@ def test_generated_module_is_self_contained(tmp_path: Path) -> None:
 
     module_path = tmp_path / "db.py"
     module_path.write_text(generated)
-    from pysely import Dialect, Pysely
+    from pysely import Database, Dialect, Pysely
     from pysely.query_compiler import BindingProfile
 
     sys.path.insert(0, str(tmp_path))
     try:
         module = importlib.import_module("db")
-        db = Pysely.create(
+        db = Database(
             schema=module.DatabaseSchema, dialect=Dialect(BindingProfile("test", "?"))
         )
         # The schema names its client, and create() returns that client.
@@ -234,11 +234,11 @@ class PlainSchema:
     person: PlainPersonTable
 
 
-def test_create_falls_back_to_plain_client_for_ungenerated_schema() -> None:
-    from pysely import Dialect, Pysely
+def test_database_falls_back_to_plain_client_for_ungenerated_schema() -> None:
+    from pysely import Database, Dialect, Pysely
     from pysely.query_compiler import BindingProfile
 
-    db = Pysely.create(schema=PlainSchema, dialect=Dialect(BindingProfile("test", "?")))
+    db = Database(schema=PlainSchema, dialect=Dialect(BindingProfile("test", "?")))
     assert type(db) is Pysely
     assert db.select_from("person").select("id").compile().sql == (
         'select "id" from "person"'

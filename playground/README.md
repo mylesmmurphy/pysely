@@ -41,8 +41,11 @@ uv run --no-sync zensical build --clean
 python scripts/fingerprint_docs_assets.py
 ```
 
-`scripts/build-assets.mjs` packages the pinned Pyright typeshed and the real
-`src/pysely` Python sources. The generated manifest records the checker version,
+`scripts/build-assets.mjs` packages the pinned Pyright typeshed's `stdlib`
+stubs only and the real `src/pysely` Python sources. The third-party `stubs/`
+tree is deliberately left out: the playground can never import those packages,
+and inside the worker's in-memory filesystem they cost Pyright about 1.2 GB
+(the tab measured ~1.6 GB with them and ~0.4 GB without). The generated manifest records the checker version,
 source revision, Python targets, schema hash, and typeshed size/hash.
 `scripts/fingerprint_docs_assets.py` gives browser assets content-hashed names in
 the generated site so each deployment invalidates changed files automatically.

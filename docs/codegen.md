@@ -1,10 +1,10 @@
 # Code generation
 
 One command turns your schema classes into one module. Pass its schema class
-to `Pysely.create`; nothing else is needed.
+to `Database`; nothing else is needed.
 
 ```
-schema.py  ──  pysely codegen  ──▶  db.py  ──  Pysely.create(schema=…)  ──▶  typed client
+schema.py  ──  pysely codegen  ──▶  db.py  ──  Database(schema=…)  ──▶  typed client
 (you write)                          (generated)
 ```
 
@@ -52,9 +52,9 @@ needed at runtime.
 
 ```python
 from db import DatabaseSchema
-from pysely import Pysely
+from pysely import Database
 
-db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=DatabaseSchema, dialect=dialect)
 
 query = (
     db.select_from("person")
@@ -65,7 +65,7 @@ query = (
 )
 ```
 
-`Pysely.create` returns the typed client named by the generated schema; for a
+`Database` returns the typed client named by the generated schema; for a
 plain schema it returns an ordinary `Pysely`. mypy and Pyright now reject
 unknown tables, unknown or unjoined columns, and values of the wrong type.
 `rows[0]["pet_name"]` is typed.

@@ -29,9 +29,9 @@ pysely codegen schema.py --output db.py
 
 ```python
 from db import DatabaseSchema
-from pysely import Pysely
+from pysely import Database
 
-db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=DatabaseSchema, dialect=dialect)
 ```
 
 mypy and Pyright now know every table, column, and value type. No checker

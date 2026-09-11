@@ -1,9 +1,9 @@
 from database import DatabaseSchema
 
 from playground import dialect
-from pysely import Pysely
+from pysely import Database
 
-db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=DatabaseSchema, dialect=dialect)
 
 # Try it: misspell a column, or change "dog" to "bird".
 query = (

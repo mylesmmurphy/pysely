@@ -56,45 +56,6 @@ class Pysely(Generic[DatabaseT]):
     async def __aexit__(self, *exc_info: object) -> None:
         await self.destroy()
 
-    @overload
-    @classmethod
-    def create(  # type: ignore[overload-overlap]
-        cls,
-        *,
-        dialect: Dialect,
-        schema: type[GeneratedSchema[ClientT]],
-        plugins: tuple[QueryPlugin, ...] = (),
-    ) -> ClientT: ...
-
-    @overload
-    @classmethod
-    def create(
-        cls,
-        *,
-        dialect: Dialect,
-        schema: type[SchemaT],
-        plugins: tuple[QueryPlugin, ...] = (),
-    ) -> Pysely[SchemaT]: ...
-
-    @classmethod
-    def create(
-        cls,
-        *,
-        dialect: Dialect,
-        schema: type[Any],
-        plugins: tuple[QueryPlugin, ...] = (),
-    ) -> Any:
-        """Build a client for a schema.
-
-        A schema written by `pysely codegen` names its typed client, and that
-        client is returned; any other annotated schema gets a plain `Pysely`
-        with runtime validation only.
-        """
-        client = getattr(schema, "__pysely_client__", None)
-        if client is not None:
-            return client(dialect=dialect, schema=schema, plugins=plugins)
-        return cls(dialect=dialect, schema=schema, plugins=plugins)
-
     @classmethod
     def from_executor(
         cls, executor: QueryExecutor, schema: Schema | None = None
@@ -270,3 +231,39 @@ class ConnectionContext(Generic[DatabaseT]):
             await driver.release_connection(connection)
         finally:
             self._connection = None
+
+
+@overload
+def Database(  # type: ignore[overload-overlap]
+    *,
+    schema: type[GeneratedSchema[ClientT]],
+    dialect: Dialect,
+    plugins: tuple[QueryPlugin, ...] = (),
+) -> ClientT: ...
+
+
+@overload
+def Database(
+    *,
+    schema: type[SchemaT],
+    dialect: Dialect,
+    plugins: tuple[QueryPlugin, ...] = (),
+) -> Pysely[SchemaT]: ...
+
+
+def Database(
+    *,
+    schema: type[Any],
+    dialect: Dialect,
+    plugins: tuple[QueryPlugin, ...] = (),
+) -> Any:
+    """Build a client for a schema.
+
+    A schema written by `pysely codegen` names its typed client, and that
+    client is returned. Any other annotated schema gets a plain `Pysely` with
+    runtime validation only.
+    """
+    client = getattr(schema, "__pysely_client__", None)
+    if client is not None:
+        return client(dialect=dialect, schema=schema, plugins=plugins)
+    return Pysely(dialect=dialect, schema=schema, plugins=plugins)

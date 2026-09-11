@@ -23,7 +23,7 @@ class GeneratedSchema(Generic[ClientT]):
     """Base class `pysely codegen` gives a schema class.
 
     The type argument names the typed client for that schema, which is how
-    `Pysely.create(schema=...)` knows what to build and what to return.
+    `Database(schema=...)` knows what to build and what to return.
     """
 
     __pysely_client__: ClassVar[type[Any]]

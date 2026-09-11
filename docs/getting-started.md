@@ -99,10 +99,10 @@ Pass the generated schema and the dialect to Pysely:
 
 ```python
 from db import DatabaseSchema
-from pysely import Pysely
+from pysely import Database
 
 
-db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=DatabaseSchema, dialect=dialect)
 rows = await (
     db.select_from("users")
     .select("id")

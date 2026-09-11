@@ -15,8 +15,8 @@ drift with nothing enforcing agreement.
 
 - `pysely codegen schema.py --output db.py` writes one self-contained module:
   the schema classes plus the typed client. The generated schema class inherits
-  `GeneratedSchema[DatabaseClient]`, and `Pysely.create(schema=...)` returns
-  that client — the same call shape as the untyped path. A constructor cannot
+  `GeneratedSchema[DatabaseClient]`, and the `Database(schema=...)` factory
+  exported from `pysely` returns that client; a plain schema gets a `Pysely`. A constructor cannot
   do this portably: mypy rejects a `__new__` that returns another class, and
   neither checker honours a metaclass `__call__` for it.
 - The generator parses with `ast`; it never imports, executes, or connects.

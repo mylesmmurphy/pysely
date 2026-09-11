@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { zipSync } from "fflate";
@@ -35,7 +35,13 @@ function textFiles(directory, prefix) {
 }
 
 mkdirSync(output, { recursive: true });
-const typeshed = filesUnder(join(pyright, "packages/pyright-internal/typeshed-fallback"));
+// Ship stdlib stubs only. The third-party `stubs/` tree is 4,600+ files the
+// playground can never import, and inside the worker's in-memory filesystem
+// it costs Pyright about 1.2 GB.
+const typeshed = filesUnder(
+  join(pyright, "packages/pyright-internal/typeshed-fallback"),
+  path => !path.includes(`${sep}stubs${sep}`),
+);
 const typeshedArchive = zipSync(typeshed, {
   level: 9,
   mtime: new Date("1980-01-02T00:00:00Z"),

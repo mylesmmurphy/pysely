@@ -49,8 +49,8 @@ def test_playground_regenerates_the_interface_from_the_schema_editor() -> None:
     query = (
         "from database import DatabaseSchema\n"
         "from playground import dialect\n"
-        "from pysely import Pysely\n"
-        "db = Pysely.create(schema=DatabaseSchema, dialect=dialect)\n"
+        "from pysely import Database\n"
+        "db = Database(schema=DatabaseSchema, dialect=dialect)\n"
         'compiled = db.select_from("person").select("nickname").compile()\n'
     )
 
