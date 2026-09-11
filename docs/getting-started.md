@@ -51,8 +51,8 @@ Run the generator once, and again whenever the schema changes:
 pysely codegen schema.py --output db.py
 ```
 
-`db.py` is one self-contained module: your schema classes plus a typed
-`Database` client. Commit it. See [Code generation](codegen.md).
+`db.py` is one self-contained module: your schema classes, now typed. Commit
+it. See [Code generation](codegen.md).
 
 ## Connect and query
 
@@ -95,13 +95,14 @@ pysely codegen schema.py --output db.py
     dialect = MysqlDialect(pool=pool)
     ```
 
-Pass the selected dialect to the generated client:
+Pass the generated schema and the dialect to Pysely:
 
 ```python
-from db import Database
+from db import DatabaseSchema
+from pysely import Pysely
 
 
-db = Database(dialect=dialect)
+db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
 rows = await (
     db.select_from("users")
     .select("id")
@@ -117,10 +118,11 @@ the list form compiles but types rows as `dict[str, object]`.
 
 Pysely passes values to the driver separately from generated SQL.
 
-### Without the generated client
+### Without generation
 
-`Pysely(schema=DatabaseSchema, dialect=dialect)` runs the same queries with
-runtime name validation only. No static checking; rows are `dict[str, object]`.
+The same call with the hand-written `schema.DatabaseSchema` runs the same
+queries with runtime name validation only. No static checking; rows are
+`dict[str, object]`.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

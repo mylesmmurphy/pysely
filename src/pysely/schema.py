@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import get_type_hints
+from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin, get_type_hints
 
 from pysely.errors import InvalidQueryError
 from pysely.operation_node import (
@@ -15,6 +15,24 @@ from pysely.operation_node import (
     TableNode,
     ValueNode,
 )
+
+ClientT = TypeVar("ClientT")
+
+
+class GeneratedSchema(Generic[ClientT]):
+    """Base class `pysely codegen` gives a schema class.
+
+    The type argument names the typed client for that schema, which is how
+    `Pysely.create(schema=...)` knows what to build and what to return.
+    """
+
+    __pysely_client__: ClassVar[type[Any]]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for base in getattr(cls, "__orig_bases__", ()):
+            if get_origin(base) is GeneratedSchema:
+                cls.__pysely_client__ = get_args(base)[0]
 
 
 def split_alias(value: str) -> tuple[str, str]:
@@ -42,6 +60,7 @@ class Schema:
             {
                 name: get_type_hints(row)
                 for name, row in get_type_hints(database).items()
+                if not name.startswith("_")
             }
         )
 

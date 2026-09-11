@@ -1,11 +1,11 @@
 # Code generation
 
-One command turns your schema classes into one module. Import that module;
-nothing else is needed.
+One command turns your schema classes into one module. Pass its schema class
+to `Pysely.create`; nothing else is needed.
 
 ```
-schema.py  ──  pysely codegen  ──▶  db.py
-(you write)                          (generated, self-contained)
+schema.py  ──  pysely codegen  ──▶  db.py  ──  Pysely.create(schema=…)  ──▶  typed client
+(you write)                          (generated)
 ```
 
 ## 1. Write the schema
@@ -35,8 +35,8 @@ class DatabaseSchema:
 ```
 
 - One class per table. The database class maps table names to those classes.
-- Don't name the database class `Database` or `DatabaseQuery`; the output
-  defines those.
+- Don't name a class `DatabaseClient` or `DatabaseQuery`; the output defines
+  those.
 
 ## 2. Generate
 
@@ -44,15 +44,17 @@ class DatabaseSchema:
 pysely codegen schema.py --output db.py
 ```
 
-`db.py` contains a copy of your schema classes plus a typed `Database` client.
-Commit it. `schema.py` is not needed at runtime.
+`db.py` contains a copy of your schema classes, with `DatabaseSchema` now
+carrying the typing, plus the client it builds. Commit it. `schema.py` is not
+needed at runtime.
 
 ## 3. Query
 
 ```python
-from db import Database
+from db import DatabaseSchema
+from pysely import Pysely
 
-db = Database(dialect=dialect)
+db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
 
 query = (
     db.select_from("person")
@@ -63,8 +65,10 @@ query = (
 )
 ```
 
-mypy and Pyright now reject unknown tables, unknown or unjoined columns, and
-values of the wrong type. `rows[0]["pet_name"]` is typed.
+`Pysely.create` returns the typed client named by the generated schema; for a
+plain schema it returns an ordinary `Pysely`. mypy and Pyright now reject
+unknown tables, unknown or unjoined columns, and values of the wrong type.
+`rows[0]["pet_name"]` is typed.
 
 ## Keep it current
 

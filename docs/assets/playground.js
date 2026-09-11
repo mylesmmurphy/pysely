@@ -194,7 +194,9 @@
       client = new LspClient(worker, files);
       client.diagnostics = params => {
         const model = monaco.editor.getModel(monaco.Uri.parse(params.uri));
-        if (!model || (params.version && params.version < model.getVersionId())) return;
+        if (!model) return;
+        const generatedUri = model.uri.path === "/workspace/database.py";
+        if (!generatedUri && params.version && params.version < model.getVersionId()) return;
         monaco.editor.setModelMarkers(model, "pyright", params.diagnostics.map(item => ({
           ...lspRange(item.range), message: item.message, code: item.code,
           severity: [0, monaco.MarkerSeverity.Error, monaco.MarkerSeverity.Warning, monaco.MarkerSeverity.Info, monaco.MarkerSeverity.Hint][item.severity || 4],
@@ -343,13 +345,26 @@
         quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
       const schemaUri = monaco.Uri.parse("file:///workspace/schema.py");
       const queryUri = monaco.Uri.parse("file:///workspace/query.py");
+      const generatedUri = monaco.Uri.parse("file:///workspace/database.py");
       monaco.editor.getModel(schemaUri)?.dispose();
       monaco.editor.getModel(queryUri)?.dispose();
+      monaco.editor.getModel(generatedUri)?.dispose();
       const models = [
         monaco.editor.createModel(examples[0], "python", schemaUri),
         monaco.editor.createModel(examples[1], "python", queryUri),
         monaco.editor.createModel("", "sql"),
       ];
+      // The generated module, shown read-only under "View generated code".
+      const generatedModel = monaco.editor.createModel("# Run to generate database.py", "python", generatedUri);
+      const generatedDetails = root.querySelector("#playground-generated");
+      let generatedEditor;
+      const showGenerated = () => {
+        if (!generatedDetails.open || generatedEditor) return;
+        generatedEditor = monaco.editor.create(root.querySelector("#playground-generated-editor"), {
+          ...options, model: generatedModel, readOnly: true, ariaLabel: "generated database.py",
+        });
+      };
+      generatedDetails.addEventListener("toggle", showGenerated);
       for (const name of ["schema", "query", "sql"]) root.querySelector(`#playground-${name}`).textContent = "";
       const editors = ["schema", "query", "sql"].map((name, index) => monaco.editor.create(
         root.querySelector(`#playground-${name}`), { ...options, model: models[index], readOnly: index === 2, ariaLabel: `${name} editor` },
@@ -409,6 +424,7 @@
               const changed = data.database !== generated;
               generated = data.database;
               pushGenerated(generated);
+              if (changed) generatedModel.setValue(generated);
               codegenStatus.textContent = first
                 ? "database.py: generated from schema.py"
                 : changed ? "database.py: regenerated from schema.py" : "database.py: up to date";
@@ -477,7 +493,7 @@
           .catch(failure => { console.error("Could not start Pyright", failure); });
       };
       intelligenceRetry.onclick = loadIntelligence;
-      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; generatedDetails.removeEventListener("toggle", showGenerated); generatedEditor?.dispose(); generatedModel.dispose(); observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
       setTimeout(() => loadIntelligence().finally(run), 500);
     } catch (failure) {
       status.textContent = "Could not load playground";

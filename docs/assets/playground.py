@@ -107,7 +107,7 @@ def evaluate_playground(schema_code, query_code, dialect_name):
         # Exactly what `pysely codegen` writes for this schema. The playground
         # runs the real generator so the typed interface always matches the
         # schema editor rather than a file baked in at build time.
-        database_code = generate(schema_code)
+        database_code = generate(schema_code, output="database.py")
         schema = types.ModuleType("schema")
         sys.modules["schema"] = schema
         exec(compile(schema_code, "schema.py", "exec"), schema.__dict__)

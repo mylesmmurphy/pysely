@@ -28,12 +28,18 @@ hide:
   </div>
   <div class="pysely-playground__parameters"><span>Parameters</span><code id="playground-parameters">[]</code></div>
   <pre id="playground-error" role="alert" hidden></pre>
+  <details id="playground-generated" class="pysely-playground__generated">
+    <summary>View generated code · <code>database.py</code></summary>
+    <p>Written by <code>pysely codegen</code> from the schema above. Read-only; it is regenerated on every run.</p>
+    <div id="playground-generated-editor" class="pysely-editor pysely-editor--generated"></div>
+  </details>
 </div>
 
 - Run compiles a query in your browser with the selected dialect. No database
   connection is required.
 - Every schema edit reruns `pysely codegen` in the browser. The generated
-  `database.py` is what Pyright checks `query.py` against; it is not shown.
+  `database.py` is what Pyright checks `query.py` against; expand
+  **View generated code** below to read it.
 - Suggestions and diagnostics come from stock Pyright (`standard` mode) in a
   browser worker.
 - `run_query` shows the typed result; the playground does not execute it.

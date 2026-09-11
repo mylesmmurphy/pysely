@@ -38,9 +38,10 @@ pysely codegen schema.py --output db.py
 ```
 
 ```python
-from db import Database
+from db import DatabaseSchema
+from pysely import Pysely
 
-db = Database(dialect=dialect)
+db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
 ```
 
 | Capability | Status |

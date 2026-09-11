@@ -14,11 +14,15 @@ drift with nothing enforcing agreement.
 ## Decision
 
 - `pysely codegen schema.py --output db.py` writes one self-contained module:
-  the schema classes plus the typed interface. Applications import only `db.py`.
+  the schema classes plus the typed client. The generated schema class inherits
+  `GeneratedSchema[DatabaseClient]`, and `Pysely.create(schema=...)` returns
+  that client — the same call shape as the untyped path. A constructor cannot
+  do this portably: mypy rejects a `__new__` that returns another class, and
+  neither checker honours a metaclass `__call__` for it.
 - The generator parses with `ast`; it never imports, executes, or connects.
 - Output is committed; `--check` gates drift in CI and a pre-commit hook.
 - The mypy plugin is removed.
-- The schema may not define `Database` or `DatabaseQuery`.
+- The schema may not define `DatabaseClient` or `DatabaseQuery`.
 - The playground regenerates `db.py` from the schema editor on every run.
 
 ## Consequences

@@ -200,25 +200,49 @@ def test_generated_module_is_self_contained(tmp_path: Path) -> None:
     generated = generate(SCHEMA)
     assert "from schema import" not in generated
     assert "class PersonTable:" in generated
-    assert "class DatabaseSchema:" in generated
+    assert "class DatabaseSchema(GeneratedSchema[DatabaseClient]):" in generated
 
     module_path = tmp_path / "db.py"
     module_path.write_text(generated)
-    from pysely import Dialect
+    from pysely import Dialect, Pysely
     from pysely.query_compiler import BindingProfile
 
     sys.path.insert(0, str(tmp_path))
     try:
         module = importlib.import_module("db")
-        db = module.Database(dialect=Dialect(BindingProfile("test", "?")))
-        query = db.select_from("pet").where("species", "=", "cat").select("id")
+        db = Pysely.create(
+            schema=module.DatabaseSchema, dialect=Dialect(BindingProfile("test", "?"))
+        )
+        # The schema names its client, and create() returns that client.
+        assert type(db) is module.DatabaseClient
+        assert isinstance(db, Pysely)
+        query = db.select_from("pet").where("species", "=", "cat").select("pet.id")
         compiled = query.compile()
     finally:
         sys.path.remove(str(tmp_path))
         sys.modules.pop("db", None)
 
-    assert compiled.sql == 'select "id" from "pet" where "species" = ?'
+    assert compiled.sql == 'select "pet"."id" from "pet" where "species" = ?'
     assert compiled.parameters == ("cat",)
+
+
+class PlainPersonTable:
+    id: int
+
+
+class PlainSchema:
+    person: PlainPersonTable
+
+
+def test_create_falls_back_to_plain_client_for_ungenerated_schema() -> None:
+    from pysely import Dialect, Pysely
+    from pysely.query_compiler import BindingProfile
+
+    db = Pysely.create(schema=PlainSchema, dialect=Dialect(BindingProfile("test", "?")))
+    assert type(db) is Pysely
+    assert db.select_from("person").select("id").compile().sql == (
+        'select "id" from "person"'
+    )
 
 
 def test_generated_module_merges_schema_typing_imports() -> None:
@@ -231,6 +255,11 @@ def test_generated_module_merges_schema_typing_imports() -> None:
 
 
 def test_rejects_schema_class_names_the_output_defines() -> None:
-    source = SCHEMA.replace("class DatabaseSchema:", "class Database:")
-    with pytest.raises(SchemaError, match="reserved.*Database"):
+    source = SCHEMA.replace("class DatabaseSchema:", "class DatabaseClient:")
+    with pytest.raises(SchemaError, match="reserved.*DatabaseClient"):
         generate(source)
+
+
+def test_schema_may_be_named_database() -> None:
+    generated = generate(SCHEMA.replace("class DatabaseSchema:", "class Database:"))
+    assert "class Database(GeneratedSchema[DatabaseClient]):" in generated

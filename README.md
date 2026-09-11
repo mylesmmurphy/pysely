@@ -27,7 +27,14 @@ Write your tables as annotated classes, generate one module, import it:
 pysely codegen schema.py --output db.py
 ```
 
-`db.py` gives mypy and Pyright every table, column, and value type. No checker
+```python
+from db import DatabaseSchema
+from pysely import Pysely
+
+db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
+```
+
+mypy and Pyright now know every table, column, and value type. No checker
 plugin. See [Code generation](https://pysely.dev/codegen/).
 
 Install the development release with the driver extra for your database:

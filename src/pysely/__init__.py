@@ -32,6 +32,7 @@ from .query_builder import (
 )
 from .query_compiler import BindingProfile, CompiledQuery
 from .query_executor import QueryPlugin
+from .schema import GeneratedSchema
 
 __all__ = [
     "AliasedExpression",
@@ -44,6 +45,7 @@ __all__ = [
     "Dialect",
     "Expression",
     "ExpressionBuilder",
+    "GeneratedSchema",
     "InsertQueryBuilder",
     "InsertResult",
     "InvalidQueryError",

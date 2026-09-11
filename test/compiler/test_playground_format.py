@@ -34,7 +34,7 @@ def test_playground_compiles_example_with_each_dialect() -> None:
         result = cast(dict[str, Any], json.loads(evaluate(schema, query, dialect)))
         assert "error" not in result
         assert "pet_name" in result["sql"]
-        assert result["database"] == generate(schema)
+        assert result["database"] == generate(schema, output="database.py")
 
 
 def test_playground_regenerates_the_interface_from_the_schema_editor() -> None:
@@ -43,12 +43,14 @@ def test_playground_regenerates_the_interface_from_the_schema_editor() -> None:
     evaluate = cast(Callable[[str, str, str], str], namespace["evaluate_playground"])
     schema = (Path("docs/assets/examples") / "schema.py").read_text()
     edited = schema.replace(
-        "    verified: bool\n", "    verified: bool\n    nickname: str | None\n"
+        "    last_name: str | None\n",
+        "    last_name: str | None\n    nickname: str | None\n",
     )
     query = (
-        "from database import Database\n"
+        "from database import DatabaseSchema\n"
         "from playground import dialect\n"
-        "db = Database(dialect=dialect)\n"
+        "from pysely import Pysely\n"
+        "db = Pysely.create(schema=DatabaseSchema, dialect=dialect)\n"
         'compiled = db.select_from("person").select("nickname").compile()\n'
     )
 

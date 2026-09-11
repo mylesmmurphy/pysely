@@ -1,22 +1,19 @@
-from typing import Literal
-
-from database import Database
+from database import DatabaseSchema
 
 from playground import dialect
+from pysely import Pysely
 
-db = Database(dialect=dialect)
-species: Literal["cat", "dog", "hamster"] = "dog"
+db = Pysely.create(schema=DatabaseSchema, dialect=dialect)
 
+# Try it: misspell a column, or change "dog" to "bird".
 query = (
     db.select_from("person")
     .inner_join("pet", "owner_id", "person.id")
-    .where("first_name", "=", "Jennifer")
-    .where("species", "=", species)
-    .where("person.status", "!=", "inactive")
+    .where("species", "=", "dog")
+    .where("status", "=", "active")
     .select("first_name")
-    .select("status")
+    .select("last_name")
     .select_as("pet.name", "pet_name")
-    .select_as("pet.birth_date", "pet_birth_date")
 )
 
 compiled = query.compile()
@@ -24,8 +21,5 @@ compiled = query.compile()
 
 async def run_query() -> None:
     rows = await query.execute()
-    # Result keys are typed and offer autocomplete.
-    rows[0]["first_name"]
-    rows[0]["status"]
-    rows[0]["pet_name"]
-    rows[0]["pet_birth_date"]
+    rows[0]["pet_name"]  # hover: str
+    rows[0]["last_name"]  # hover: str | None
