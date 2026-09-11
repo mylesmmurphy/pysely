@@ -37,12 +37,13 @@ from typing import (
 )
 
 from pysely import (
+    Cons,
     Expression,
     ExpressionBuilder,
     GeneratedSchema,
+    Nil,
+    OrderDirection,
     Pysely,
-    ReferenceOperator,
-    Row,
     TypedSchemaQueryBuilder,
 )
 
@@ -70,8 +71,19 @@ class ToyTable:
     price: float
 
 
-# Column references in scope once a table is joined.
+# XColumns: every spelling, valid while X is the only table in the
+# query. XScope: the spellings that stay unambiguous after a join.
 PersonColumns: TypeAlias = Literal[
+    "person.id",
+    "person.first_name",
+    "person.last_name",
+    "person.status",
+    "id",
+    "first_name",
+    "last_name",
+    "status",
+]
+PersonScope: TypeAlias = Literal[
     "person.id",
     "person.first_name",
     "person.last_name",
@@ -86,6 +98,18 @@ PetColumns: TypeAlias = Literal[
     "pet.name",
     "pet.species",
     "pet.born",
+    "id",
+    "owner_id",
+    "name",
+    "species",
+    "born",
+]
+PetScope: TypeAlias = Literal[
+    "pet.id",
+    "pet.owner_id",
+    "pet.name",
+    "pet.species",
+    "pet.born",
     "owner_id",
     "species",
     "born",
@@ -95,430 +119,61 @@ ToyColumns: TypeAlias = Literal[
     "toy.pet_id",
     "toy.name",
     "toy.price",
+    "id",
+    "pet_id",
+    "name",
+    "price",
+]
+ToyScope: TypeAlias = Literal[
+    "toy.id",
+    "toy.pet_id",
+    "toy.name",
+    "toy.price",
     "pet_id",
     "price",
 ]
 TableName: TypeAlias = Literal["person", "pet", "toy"]
 
-# Query state: columns in scope, tables joined nullably, row type.
+# Query state: tables joined, columns in scope, tables joined
+# nullably, selected fields (newest first), and whether a right or
+# full join made every field nullable.
+TableT = TypeVar("TableT", bound=str)
+TablesT = TypeVar("TablesT", bound=str)
+ColumnsT = TypeVar("ColumnsT", bound=str)
 ColumnT = TypeVar("ColumnT", bound=str)
+ScopeT = TypeVar("ScopeT", bound=str)
 NullT = TypeVar("NullT", bound=str)
-RowT = TypeVar("RowT")
+FieldsT = TypeVar("FieldsT")
+StarT = TypeVar("StarT", bound=str)
 AliasT = TypeVar("AliasT", bound=LiteralString | Literal[""])
-# Row state: the selected keys of each value type, and whether an
-# outer join made every key nullable.
-IntKeys = TypeVar("IntKeys", bound=str)
-OptIntKeys = TypeVar("OptIntKeys", bound=str)
-StrKeys = TypeVar("StrKeys", bound=str)
-OptStrKeys = TypeVar("OptStrKeys", bound=str)
-StatusKeys = TypeVar("StatusKeys", bound=str)
-OptStatusKeys = TypeVar("OptStatusKeys", bound=str)
-SpeciesKeys = TypeVar("SpeciesKeys", bound=str)
-OptSpeciesKeys = TypeVar("OptSpeciesKeys", bound=str)
-DateKeys = TypeVar("DateKeys", bound=str)
-OptDateKeys = TypeVar("OptDateKeys", bound=str)
-FloatKeys = TypeVar("FloatKeys", bound=str)
-OptFloatKeys = TypeVar("OptFloatKeys", bound=str)
-ObjectKeys = TypeVar("ObjectKeys", bound=str)
-NullRowT = TypeVar("NullRowT", bound=str)
+# Positions in the selected-field list, for ordering by an alias.
+RestT = TypeVar("RestT")
+K1 = TypeVar("K1", bound=str)
+K2 = TypeVar("K2", bound=str)
+K3 = TypeVar("K3", bound=str)
+K4 = TypeVar("K4", bound=str)
+K5 = TypeVar("K5", bound=str)
+K6 = TypeVar("K6", bound=str)
+K7 = TypeVar("K7", bound=str)
+K8 = TypeVar("K8", bound=str)
+V1 = TypeVar("V1")
+V2 = TypeVar("V2")
+V3 = TypeVar("V3")
+V4 = TypeVar("V4")
+V5 = TypeVar("V5")
+V6 = TypeVar("V6")
+V7 = TypeVar("V7")
+V8 = TypeVar("V8")
 
 if TYPE_CHECKING:
-
-    class DatabaseRow(
-        Row,
-        Generic[
-            IntKeys,
-            OptIntKeys,
-            StrKeys,
-            OptStrKeys,
-            StatusKeys,
-            OptStatusKeys,
-            SpeciesKeys,
-            OptSpeciesKeys,
-            DateKeys,
-            OptDateKeys,
-            FloatKeys,
-            OptFloatKeys,
-            ObjectKeys,
-            NullRowT,
-        ],
+    # Callback predicates get the same scope and value checks as a
+    # flat where() call.
+    class DatabaseExpressionBuilder(
+        ExpressionBuilder[ColumnT], Generic[TablesT, ColumnT]
     ):
-        # After a right or full join every key may be None.
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: IntKeys,
-        ) -> int | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: OptIntKeys,
-        ) -> int | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: StrKeys,
-        ) -> str | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: OptStrKeys,
-        ) -> str | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: StatusKeys,
-        ) -> Literal["active", "inactive"] | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: OptStatusKeys,
-        ) -> Literal["active", "inactive"] | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: SpeciesKeys,
-        ) -> Literal["cat", "dog", "hamster"] | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: OptSpeciesKeys,
-        ) -> Literal["cat", "dog", "hamster"] | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: DateKeys,
-        ) -> date | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: OptDateKeys,
-        ) -> date | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: FloatKeys,
-        ) -> float | None: ...
-
-        @overload
-        def __getitem__(
-            self: DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
-            key: OptFloatKeys,
-        ) -> float | None: ...
-
-        @overload
-        def __getitem__(self, key: IntKeys) -> int: ...
-
-        @overload
-        def __getitem__(self, key: OptIntKeys) -> int | None: ...
-
-        @overload
-        def __getitem__(self, key: StrKeys) -> str: ...
-
-        @overload
-        def __getitem__(self, key: OptStrKeys) -> str | None: ...
-
-        @overload
-        def __getitem__(self, key: StatusKeys) -> Literal["active", "inactive"]: ...
-
-        @overload
-        def __getitem__(
-            self, key: OptStatusKeys
-        ) -> Literal["active", "inactive"] | None: ...
-
-        @overload
-        def __getitem__(self, key: SpeciesKeys) -> Literal["cat", "dog", "hamster"]: ...
-
-        @overload
-        def __getitem__(
-            self, key: OptSpeciesKeys
-        ) -> Literal["cat", "dog", "hamster"] | None: ...
-
-        @overload
-        def __getitem__(self, key: DateKeys) -> date: ...
-
-        @overload
-        def __getitem__(self, key: OptDateKeys) -> date | None: ...
-
-        @overload
-        def __getitem__(self, key: FloatKeys) -> float: ...
-
-        @overload
-        def __getitem__(self, key: OptFloatKeys) -> float | None: ...
-
-        @overload
-        def __getitem__(self, key: ObjectKeys) -> object: ...
-
-        def __getitem__(self, key: str) -> object:
-            return super().__getitem__(key)
-
-        @overload
-        def get(self, key: IntKeys) -> int | None: ...
-
-        @overload
-        def get(self, key: OptIntKeys) -> int | None: ...
-
-        @overload
-        def get(self, key: StrKeys) -> str | None: ...
-
-        @overload
-        def get(self, key: OptStrKeys) -> str | None: ...
-
-        @overload
-        def get(self, key: StatusKeys) -> Literal["active", "inactive"] | None: ...
-
-        @overload
-        def get(self, key: OptStatusKeys) -> Literal["active", "inactive"] | None: ...
-
-        @overload
-        def get(self, key: SpeciesKeys) -> Literal["cat", "dog", "hamster"] | None: ...
-
-        @overload
-        def get(
-            self, key: OptSpeciesKeys
-        ) -> Literal["cat", "dog", "hamster"] | None: ...
-
-        @overload
-        def get(self, key: DateKeys) -> date | None: ...
-
-        @overload
-        def get(self, key: OptDateKeys) -> date | None: ...
-
-        @overload
-        def get(self, key: FloatKeys) -> float | None: ...
-
-        @overload
-        def get(self, key: OptFloatKeys) -> float | None: ...
-
-        @overload
-        def get(self, key: ObjectKeys) -> object: ...
-
-        @overload
-        def get(self, key: str) -> object: ...
-
-        def get(self, key: str, default: object = None) -> object:
-            return super().get(key, default)
-
-    class DatabaseExpressionBuilder(ExpressionBuilder[ColumnT]):
-        # Callback predicates get the same scope and value checks as
-        # a flat where() call.
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[PersonColumns],
-            column: Literal["id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PersonColumns],
-            column: Literal["id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PersonColumns],
-            column: Literal["id"],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal["person.id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: int,
@@ -526,7 +181,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal["person.id"],
             operator: Literal["in", "not in"],
             value: list[int] | tuple[int, ...],
@@ -534,7 +189,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal[
                 "person.first_name", "first_name", "person.last_name", "last_name"
             ],
@@ -544,7 +199,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal[
                 "person.first_name", "first_name", "person.last_name", "last_name"
             ],
@@ -554,7 +209,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal[
                 "person.first_name", "first_name", "person.last_name", "last_name"
             ],
@@ -564,7 +219,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal["person.status", "status"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: Literal["active", "inactive"],
@@ -572,7 +227,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal["person.status", "status"],
             operator: Literal["in", "not in"],
             value: list[Literal["active", "inactive"]]
@@ -581,7 +236,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal["person.status", "status"],
             operator: Literal["like", "not like"],
             value: str,
@@ -589,7 +244,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PersonColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal[
                 "person.id",
                 "person.first_name",
@@ -605,55 +260,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[PetColumns],
-            column: Literal["id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PetColumns],
-            column: Literal["id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PetColumns],
-            column: Literal["name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PetColumns],
-            column: Literal["name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PetColumns],
-            column: Literal["name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[PetColumns],
-            column: Literal["id", "name"],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.id", "pet.owner_id", "owner_id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: int,
@@ -661,7 +268,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.id", "pet.owner_id", "owner_id"],
             operator: Literal["in", "not in"],
             value: list[int] | tuple[int, ...],
@@ -669,7 +276,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.name"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: str,
@@ -677,7 +284,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.name"],
             operator: Literal["in", "not in"],
             value: list[str] | tuple[str, ...],
@@ -685,7 +292,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.name"],
             operator: Literal["like", "not like"],
             value: str,
@@ -693,7 +300,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.species", "species"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: Literal["cat", "dog", "hamster"],
@@ -701,7 +308,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.species", "species"],
             operator: Literal["in", "not in"],
             value: list[Literal["cat", "dog", "hamster"]]
@@ -710,7 +317,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.species", "species"],
             operator: Literal["like", "not like"],
             value: str,
@@ -718,7 +325,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.born", "born"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: date,
@@ -726,7 +333,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal["pet.born", "born"],
             operator: Literal["in", "not in"],
             value: list[date] | tuple[date, ...],
@@ -734,7 +341,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | PetColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["pet"], ColumnT],
             column: Literal[
                 "pet.id",
                 "pet.owner_id",
@@ -751,55 +358,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            column: Literal["id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            column: Literal["id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            column: Literal["name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            column: Literal["name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            column: Literal["name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            column: Literal["id", "name"],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.id", "toy.pet_id", "pet_id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: int,
@@ -807,7 +366,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.id", "toy.pet_id", "pet_id"],
             operator: Literal["in", "not in"],
             value: list[int] | tuple[int, ...],
@@ -815,7 +374,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.name"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: str,
@@ -823,7 +382,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.name"],
             operator: Literal["in", "not in"],
             value: list[str] | tuple[str, ...],
@@ -831,7 +390,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.name"],
             operator: Literal["like", "not like"],
             value: str,
@@ -839,7 +398,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.price", "price"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: float,
@@ -847,7 +406,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal["toy.price", "price"],
             operator: Literal["in", "not in"],
             value: list[float] | tuple[float, ...],
@@ -855,7 +414,7 @@ if TYPE_CHECKING:
 
         @overload
         def __call__(
-            self: DatabaseExpressionBuilder[ColumnT | ToyColumns],
+            self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal[
                 "toy.id", "toy.pet_id", "pet_id", "toy.name", "toy.price", "price"
             ],
@@ -866,1452 +425,706 @@ if TYPE_CHECKING:
         def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
             return super().__call__(column, operator, value)
 
+    class PersonExpressionBuilder(ExpressionBuilder[PersonColumns]):
         @overload
-        def ref(
-            self: DatabaseExpressionBuilder[PersonColumns],
-            left: PersonColumns | Literal["id"],
-            operator: ReferenceOperator,
-            right: PersonColumns | Literal["id"],
+        def __call__(
+            self,
+            column: Literal["person.id", "id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
         ) -> Expression[bool]: ...
 
         @overload
-        def ref(
-            self: DatabaseExpressionBuilder[PetColumns],
-            left: PetColumns | Literal["id", "name"],
-            operator: ReferenceOperator,
-            right: PetColumns | Literal["id", "name"],
+        def __call__(
+            self,
+            column: Literal["person.id", "id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
         ) -> Expression[bool]: ...
 
         @overload
-        def ref(
-            self: DatabaseExpressionBuilder[ToyColumns],
-            left: ToyColumns | Literal["id", "name"],
-            operator: ReferenceOperator,
-            right: ToyColumns | Literal["id", "name"],
+        def __call__(
+            self,
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
         ) -> Expression[bool]: ...
 
         @overload
-        def ref(
-            self, left: ColumnT, operator: ReferenceOperator, right: ColumnT
+        def __call__(
+            self,
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
         ) -> Expression[bool]: ...
 
-        def ref(
-            self, left: Any, operator: ReferenceOperator, right: Any
-        ) -> Expression[bool]:
-            return super().ref(left, operator, right)
+        @overload
+        def __call__(
+            self,
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
 
+        @overload
+        def __call__(
+            self,
+            column: Literal["person.status", "status"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["active", "inactive"],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["person.status", "status"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["active", "inactive"]]
+            | tuple[Literal["active", "inactive"], ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["person.status", "status"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal[
+                "person.id",
+                "id",
+                "person.first_name",
+                "first_name",
+                "person.last_name",
+                "last_name",
+                "person.status",
+                "status",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> Expression[bool]: ...
+
+        def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
+            return super().__call__(column, operator, value)
+
+    class PetExpressionBuilder(ExpressionBuilder[PetColumns]):
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.name", "name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.name", "name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.name", "name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.species", "species"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["cat", "dog", "hamster"],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.species", "species"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["cat", "dog", "hamster"]]
+            | tuple[Literal["cat", "dog", "hamster"], ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.species", "species"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.born", "born"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: date,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["pet.born", "born"],
+            operator: Literal["in", "not in"],
+            value: list[date] | tuple[date, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal[
+                "pet.id",
+                "id",
+                "pet.owner_id",
+                "owner_id",
+                "pet.name",
+                "name",
+                "pet.species",
+                "species",
+                "pet.born",
+                "born",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> Expression[bool]: ...
+
+        def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
+            return super().__call__(column, operator, value)
+
+    class ToyExpressionBuilder(ExpressionBuilder[ToyColumns]):
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.name", "name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.name", "name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.name", "name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.price", "price"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: float,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal["toy.price", "price"],
+            operator: Literal["in", "not in"],
+            value: list[float] | tuple[float, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self,
+            column: Literal[
+                "toy.id",
+                "id",
+                "toy.pet_id",
+                "pet_id",
+                "toy.name",
+                "name",
+                "toy.price",
+                "price",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> Expression[bool]: ...
+
+        def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
+            return super().__call__(column, operator, value)
+
+    # Joined queries. One overload per column; the nullable form
+    # comes first and only matches once its table is outer-joined.
     class DatabaseQuery(
-        TypedSchemaQueryBuilder["DatabaseSchema", ColumnT, RowT],
-        Generic[ColumnT, NullT, RowT],
+        TypedSchemaQueryBuilder["DatabaseSchema", ColumnT, FieldsT, StarT],
+        Generic[TablesT, ColumnT, NullT, FieldsT, StarT],
     ):
-        # select: one overload per column. The nullable form comes
-        # first and only matches once the table is outer-joined.
         @overload
         def select(
             self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.id"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | Literal["id"],
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.id"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | Literal["id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                PersonColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["id"],
-        ) -> DatabaseQuery[
-            PersonColumns,
-            Never,
-            DatabaseRow[
-                IntKeys | Literal["id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.first_name", "first_name"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | Literal["first_name"],
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.first_name", "first_name"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | Literal["first_name"],
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.last_name", "last_name"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | Literal["last_name"],
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.last_name", "last_name"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | Literal["last_name"],
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.status", "status"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys | Literal["status"],
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["person.status", "status"],
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys | Literal["status"],
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.id"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | Literal["id"],
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.id"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | Literal["id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                PetColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["id"],
-        ) -> DatabaseQuery[
-            PetColumns,
-            Never,
-            DatabaseRow[
-                IntKeys | Literal["id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.owner_id", "owner_id"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | Literal["owner_id"],
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.owner_id", "owner_id"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | Literal["owner_id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.name"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | Literal["name"],
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.name"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | Literal["name"],
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                PetColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["name"],
-        ) -> DatabaseQuery[
-            PetColumns,
-            Never,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | Literal["name"],
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.species", "species"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys | Literal["species"],
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.species", "species"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys | Literal["species"],
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.born", "born"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys | Literal["born"],
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["pet.born", "born"],
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys | Literal["born"],
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.id"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | Literal["id"],
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.id"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | Literal["id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ToyColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["id"],
-        ) -> DatabaseQuery[
-            ToyColumns,
-            Never,
-            DatabaseRow[
-                IntKeys | Literal["id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.pet_id", "pet_id"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | Literal["pet_id"],
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.pet_id", "pet_id"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | Literal["pet_id"],
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.name"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | Literal["name"],
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.name"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | Literal["name"],
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ToyColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["name"],
-        ) -> DatabaseQuery[
-            ToyColumns,
-            Never,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | Literal["name"],
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.price", "price"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys | Literal["price"],
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            selections: Literal["toy.price", "price"],
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys | Literal["price"],
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select(
-            self: DatabaseQuery[
+                TablesT | Literal["person"],
                 ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
             ],
-            selections: ColumnT | Sequence[ColumnT],
+            selections: Literal["person.id"],
         ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[Literal["id"], int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["person.id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
             ColumnT,
             NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                str,
-                NullRowT,
+            Cons[Literal["id"], int, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"],
+                ColumnT,
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
             ],
+            selections: Literal["person.first_name", "first_name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[Literal["first_name"], str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["person.first_name", "first_name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT,
+            Cons[Literal["first_name"], str, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"],
+                ColumnT,
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["person.last_name", "last_name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[Literal["last_name"], str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["person.last_name", "last_name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT,
+            Cons[Literal["last_name"], str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"],
+                ColumnT,
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["person.status", "status"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[Literal["status"], Literal["active", "inactive"] | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["person.status", "status"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT,
+            Cons[Literal["status"], Literal["active", "inactive"], FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["pet.id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[Literal["id"], int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["pet.id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[Literal["id"], int, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["pet.owner_id", "owner_id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[Literal["owner_id"], int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["pet.owner_id", "owner_id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[Literal["owner_id"], int, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["pet.name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[Literal["name"], str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["pet.name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[Literal["name"], str, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["pet.species", "species"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[Literal["species"], Literal["cat", "dog", "hamster"] | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["pet.species", "species"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[Literal["species"], Literal["cat", "dog", "hamster"], FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["pet.born", "born"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[Literal["born"], date | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["pet.born", "born"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[Literal["born"], date | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["toy.id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[Literal["id"], int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["toy.id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT,
+            Cons[Literal["id"], int, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["toy.pet_id", "pet_id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[Literal["pet_id"], int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["toy.pet_id", "pet_id"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT,
+            Cons[Literal["pet_id"], int, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["toy.name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[Literal["name"], str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["toy.name"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT,
+            Cons[Literal["name"], str, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            selections: Literal["toy.price", "price"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[Literal["price"], float | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            selections: Literal["toy.price", "price"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT,
+            Cons[Literal["price"], float, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select(
+            self, selections: ColumnT | Sequence[ColumnT]
+        ) -> DatabaseQuery[
+            TablesT, ColumnT, NullT, Cons[str, object, FieldsT], StarT
         ]: ...
 
         def select(self, selections: Any) -> Any:
@@ -2321,1261 +1134,366 @@ if TYPE_CHECKING:
         @overload
         def select_as(
             self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | AliasT,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | AliasT,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.first_name", "first_name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | AliasT,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.first_name", "first_name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | AliasT,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.last_name", "last_name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | AliasT,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.last_name", "last_name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | AliasT,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT | Literal["person"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.status", "status"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys | AliasT,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PersonColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["person.status", "status"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys | AliasT,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                PersonColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            PersonColumns,
-            Never,
-            DatabaseRow[
-                IntKeys | AliasT,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.id", "pet.owner_id", "owner_id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | AliasT,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.id", "pet.owner_id", "owner_id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | AliasT,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | AliasT,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | AliasT,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.species", "species"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys | AliasT,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.species", "species"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys | AliasT,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT | Literal["pet"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.born", "born"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys | AliasT,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | PetColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["pet.born", "born"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys | AliasT,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                PetColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            PetColumns,
-            Never,
-            DatabaseRow[
-                IntKeys | AliasT,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                PetColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            PetColumns,
-            Never,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | AliasT,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["toy.id", "toy.pet_id", "pet_id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys | AliasT,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["toy.id", "toy.pet_id", "pet_id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys | AliasT,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["toy.name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys | AliasT,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["toy.name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | AliasT,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT | Literal["toy"],
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["toy.price", "price"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys | AliasT,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ColumnT | ToyColumns,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["toy.price", "price"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys | AliasT,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ToyColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["id"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ToyColumns,
-            Never,
-            DatabaseRow[
-                IntKeys | AliasT,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
-                ToyColumns,
-                Never,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
-            source: Literal["name"],
-            alias: AliasT,
-        ) -> DatabaseQuery[
-            ToyColumns,
-            Never,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys | AliasT,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                NullRowT,
-            ],
-        ]: ...
-
-        @overload
-        def select_as(
-            self: DatabaseQuery[
+                TablesT | Literal["person"],
                 ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
             ],
-            source: ColumnT,
-            alias: str,
+            source: Literal["person.id"],
+            alias: AliasT,
         ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[AliasT, int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["person.id"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
             ColumnT,
             NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                str,
-                NullRowT,
+            Cons[AliasT, int, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"],
+                ColumnT,
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
             ],
+            source: Literal["person.first_name", "first_name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[AliasT, str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["person.first_name", "first_name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT,
+            Cons[AliasT, str, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"],
+                ColumnT,
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["person.last_name", "last_name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[AliasT, str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["person.last_name", "last_name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT,
+            Cons[AliasT, str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"],
+                ColumnT,
+                NullT | Literal["person"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["person.status", "status"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT | Literal["person"],
+            Cons[AliasT, Literal["active", "inactive"] | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["person.status", "status"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"],
+            ColumnT,
+            NullT,
+            Cons[AliasT, Literal["active", "inactive"], FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["pet.id", "pet.owner_id", "owner_id"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[AliasT, int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["pet.id", "pet.owner_id", "owner_id"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, Cons[AliasT, int, FieldsT], StarT
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["pet.name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[AliasT, str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["pet.name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, Cons[AliasT, str, FieldsT], StarT
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["pet.species", "species"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[AliasT, Literal["cat", "dog", "hamster"] | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["pet.species", "species"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[AliasT, Literal["cat", "dog", "hamster"], FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"],
+                ColumnT,
+                NullT | Literal["pet"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["pet.born", "born"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT | Literal["pet"],
+            Cons[AliasT, date | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["pet.born", "born"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT,
+            NullT,
+            Cons[AliasT, date | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["toy.id", "toy.pet_id", "pet_id"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[AliasT, int | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["toy.id", "toy.pet_id", "pet_id"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, Cons[AliasT, int, FieldsT], StarT
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["toy.name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[AliasT, str | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["toy.name"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, Cons[AliasT, str, FieldsT], StarT
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"],
+                ColumnT,
+                NullT | Literal["toy"],
+                FieldsT,
+                StarT,
+            ],
+            source: Literal["toy.price", "price"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT | Literal["toy"],
+            Cons[AliasT, float | None, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            source: Literal["toy.price", "price"],
+            alias: AliasT,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT,
+            NullT,
+            Cons[AliasT, float, FieldsT],
+            StarT,
+        ]: ...
+
+        @overload
+        def select_as(
+            self, source: ColumnT, alias: str
+        ) -> DatabaseQuery[
+            TablesT, ColumnT, NullT, Cons[str, object, FieldsT], StarT
         ]: ...
 
         def select_as(self, source: Any, alias: str) -> Any:
@@ -3584,102 +1502,112 @@ if TYPE_CHECKING:
         # where: operator families take different value shapes.
         @overload
         def where(
-            self: DatabaseQuery[PersonColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> DatabaseQuery[PersonColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PersonColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[PersonColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PersonColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> DatabaseQuery[PersonColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["person.id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: int,
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["person.id"],
             operator: Literal["in", "not in"],
             value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal[
                 "person.first_name", "first_name", "person.last_name", "last_name"
             ],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: str,
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal[
                 "person.first_name", "first_name", "person.last_name", "last_name"
             ],
             operator: Literal["in", "not in"],
             value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal[
                 "person.first_name", "first_name", "person.last_name", "last_name"
             ],
             operator: Literal["like", "not like"],
             value: str,
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["person.status", "status"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: Literal["active", "inactive"],
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["person.status", "status"],
             operator: Literal["in", "not in"],
             value: list[Literal["active", "inactive"]]
             | tuple[Literal["active", "inactive"], ...],
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["person.status", "status"],
             operator: Literal["like", "not like"],
             value: str,
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PersonColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal[
                 "person.id",
                 "person.first_name",
@@ -3691,140 +1619,136 @@ if TYPE_CHECKING:
             ],
             operator: Literal["is", "is not"],
             value: None,
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            column: Literal["name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            column: Literal["name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            column: Literal["name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            column: Literal["id", "name"],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.id", "pet.owner_id", "owner_id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: int,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.id", "pet.owner_id", "owner_id"],
             operator: Literal["in", "not in"],
             value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.name"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: str,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.name"],
             operator: Literal["in", "not in"],
             value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.name"],
             operator: Literal["like", "not like"],
             value: str,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.species", "species"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: Literal["cat", "dog", "hamster"],
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.species", "species"],
             operator: Literal["in", "not in"],
             value: list[Literal["cat", "dog", "hamster"]]
             | tuple[Literal["cat", "dog", "hamster"], ...],
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.species", "species"],
             operator: Literal["like", "not like"],
             value: str,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.born", "born"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: date,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["pet.born", "born"],
             operator: Literal["in", "not in"],
             value: list[date] | tuple[date, ...],
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | PetColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal[
                 "pet.id",
                 "pet.owner_id",
@@ -3837,127 +1761,115 @@ if TYPE_CHECKING:
             ],
             operator: Literal["is", "is not"],
             value: None,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            column: Literal["id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            column: Literal["name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            column: Literal["name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            column: Literal["name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            column: Literal["id", "name"],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
-
-        @overload
-        def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.id", "toy.pet_id", "pet_id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: int,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.id", "toy.pet_id", "pet_id"],
             operator: Literal["in", "not in"],
             value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.name"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: str,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.name"],
             operator: Literal["in", "not in"],
             value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.name"],
             operator: Literal["like", "not like"],
             value: str,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.price", "price"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
             value: float,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal["toy.price", "price"],
             operator: Literal["in", "not in"],
             value: list[float] | tuple[float, ...],
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
-            self: DatabaseQuery[ColumnT | ToyColumns, NullT, RowT],
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
             column: Literal[
                 "toy.id", "toy.pet_id", "pet_id", "toy.name", "toy.price", "price"
             ],
             operator: Literal["is", "is not"],
             value: None,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def where(
             self,
-            column: Callable[[DatabaseExpressionBuilder[ColumnT]], Expression[bool]],
-        ) -> DatabaseQuery[ColumnT, NullT, RowT]: ...
+            column: Callable[
+                [DatabaseExpressionBuilder[TablesT, ColumnT]], Expression[bool]
+            ],
+        ) -> DatabaseQuery[TablesT, ColumnT, NullT, FieldsT, StarT]: ...
 
         def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
             if isinstance(column, str):
@@ -3966,36 +1878,602 @@ if TYPE_CHECKING:
             return super().where(column)
 
         @overload
-        def where_ref(
-            self: DatabaseQuery[PersonColumns, Never, RowT],
-            left: PersonColumns | Literal["id"],
-            operator: ReferenceOperator,
-            right: PersonColumns | Literal["id"],
-        ) -> DatabaseQuery[PersonColumns, Never, RowT]: ...
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["person.id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
-        def where_ref(
-            self: DatabaseQuery[PetColumns, Never, RowT],
-            left: PetColumns | Literal["id", "name"],
-            operator: ReferenceOperator,
-            right: PetColumns | Literal["id", "name"],
-        ) -> DatabaseQuery[PetColumns, Never, RowT]: ...
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["person.id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
-        def where_ref(
-            self: DatabaseQuery[ToyColumns, Never, RowT],
-            left: ToyColumns | Literal["id", "name"],
-            operator: ReferenceOperator,
-            right: ToyColumns | Literal["id", "name"],
-        ) -> DatabaseQuery[ToyColumns, Never, RowT]: ...
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
-        def where_ref(
-            self, left: ColumnT, operator: ReferenceOperator, right: ColumnT
-        ) -> DatabaseQuery[ColumnT, NullT, RowT]: ...
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
 
-        def where_ref(self, left: Any, operator: Any, right: Any) -> Any:
-            return super().where_ref(left, operator, right)
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["person.status", "status"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["active", "inactive"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["person.status", "status"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["active", "inactive"]]
+            | tuple[Literal["active", "inactive"], ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["person.status", "status"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal[
+                "person.id",
+                "person.first_name",
+                "first_name",
+                "person.last_name",
+                "last_name",
+                "person.status",
+                "status",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.id", "pet.owner_id", "owner_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.id", "pet.owner_id", "owner_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.species", "species"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["cat", "dog", "hamster"],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.species", "species"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["cat", "dog", "hamster"]]
+            | tuple[Literal["cat", "dog", "hamster"], ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.species", "species"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.born", "born"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: date,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["pet.born", "born"],
+            operator: Literal["in", "not in"],
+            value: list[date] | tuple[date, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal[
+                "pet.id",
+                "pet.owner_id",
+                "owner_id",
+                "pet.name",
+                "pet.species",
+                "species",
+                "pet.born",
+                "born",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.id", "toy.pet_id", "pet_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.id", "toy.pet_id", "pet_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.price", "price"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: float,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal["toy.price", "price"],
+            operator: Literal["in", "not in"],
+            value: list[float] | tuple[float, ...],
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self: DatabaseQuery[
+                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+            ],
+            column: Literal[
+                "toy.id", "toy.pet_id", "pet_id", "toy.name", "toy.price", "price"
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
+        ]: ...
+
+        @overload
+        def having(
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[TablesT, ColumnT]], Expression[bool]
+            ],
+        ) -> DatabaseQuery[TablesT, ColumnT, NullT, FieldsT, StarT]: ...
+
+        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            return self._having(column, operator, value)
+
+        @overload
+        def order_by(
+            self, column: ColumnT, direction: OrderDirection = "asc"
+        ) -> DatabaseQuery[TablesT, ColumnT, NullT, FieldsT, StarT]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[TablesT, ColumnT, NullT, Cons[K1, V1, RestT], StarT],
+            column: K1,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[TablesT, ColumnT, NullT, Cons[K1, V1, RestT], StarT]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT, ColumnT, NullT, Cons[K1, V1, Cons[K2, V2, RestT]], StarT
+            ],
+            column: K2,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT, ColumnT, NullT, Cons[K1, V1, Cons[K2, V2, RestT]], StarT
+        ]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT,
+                ColumnT,
+                NullT,
+                Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]],
+                StarT,
+            ],
+            column: K3,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT,
+            ColumnT,
+            NullT,
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]],
+            StarT,
+        ]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT,
+                ColumnT,
+                NullT,
+                Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]],
+                StarT,
+            ],
+            column: K4,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT,
+            ColumnT,
+            NullT,
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]],
+            StarT,
+        ]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT,
+                ColumnT,
+                NullT,
+                Cons[
+                    K1,
+                    V1,
+                    Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]],
+                ],
+                StarT,
+            ],
+            column: K5,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT,
+            ColumnT,
+            NullT,
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]]],
+            StarT,
+        ]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT,
+                ColumnT,
+                NullT,
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                    ],
+                ],
+                StarT,
+            ],
+            column: K6,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT,
+            ColumnT,
+            NullT,
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                ],
+            ],
+            StarT,
+        ]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT,
+                ColumnT,
+                NullT,
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+                StarT,
+            ],
+            column: K7,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT,
+            ColumnT,
+            NullT,
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]],
+                    ],
+                ],
+            ],
+            StarT,
+        ]: ...
+
+        @overload
+        def order_by(
+            self: DatabaseQuery[
+                TablesT,
+                ColumnT,
+                NullT,
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4,
+                                V4,
+                                Cons[
+                                    K5,
+                                    V5,
+                                    Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                StarT,
+            ],
+            column: K8,
+            direction: OrderDirection = "asc",
+        ) -> DatabaseQuery[
+            TablesT,
+            ColumnT,
+            NullT,
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[
+                            K4,
+                            V4,
+                            Cons[
+                                K5, V5, Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            StarT,
+        ]: ...
+
+        def order_by(self, column: Any, direction: Any = "asc") -> Any:
+            return self._order_by(column, direction)
 
         # joins: the ON columns may use the prior scope and the new
         # table. Outer joins record which side may be missing.
@@ -4003,25 +2481,31 @@ if TYPE_CHECKING:
         def inner_join(
             self,
             table: Literal["person"],
-            left: ColumnT | PersonColumns,
-            right: ColumnT | PersonColumns,
-        ) -> DatabaseQuery[ColumnT | PersonColumns, NullT, RowT]: ...
+            left: ColumnT | PersonScope,
+            right: ColumnT | PersonScope,
+        ) -> DatabaseQuery[
+            TablesT | Literal["person"], ColumnT | PersonScope, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def inner_join(
             self,
             table: Literal["pet"],
-            left: ColumnT | PetColumns,
-            right: ColumnT | PetColumns,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT, RowT]: ...
+            left: ColumnT | PetScope,
+            right: ColumnT | PetScope,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"], ColumnT | PetScope, NullT, FieldsT, StarT
+        ]: ...
 
         @overload
         def inner_join(
             self,
             table: Literal["toy"],
-            left: ColumnT | ToyColumns,
-            right: ColumnT | ToyColumns,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT, RowT]: ...
+            left: ColumnT | ToyScope,
+            right: ColumnT | ToyScope,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"], ColumnT | ToyScope, NullT, FieldsT, StarT
+        ]: ...
 
         def inner_join(self, table: Any, left: Any, right: Any) -> Any:
             return self._join("inner", table, left, right)
@@ -4030,167 +2514,79 @@ if TYPE_CHECKING:
         def left_join(
             self,
             table: Literal["person"],
-            left: ColumnT | PersonColumns,
-            right: ColumnT | PersonColumns,
+            left: ColumnT | PersonScope,
+            right: ColumnT | PersonScope,
         ) -> DatabaseQuery[
-            ColumnT | PersonColumns, NullT | Literal["person"], RowT
+            TablesT | Literal["person"],
+            ColumnT | PersonScope,
+            NullT | Literal["person"],
+            FieldsT,
+            StarT,
         ]: ...
 
         @overload
         def left_join(
             self,
             table: Literal["pet"],
-            left: ColumnT | PetColumns,
-            right: ColumnT | PetColumns,
-        ) -> DatabaseQuery[ColumnT | PetColumns, NullT | Literal["pet"], RowT]: ...
+            left: ColumnT | PetScope,
+            right: ColumnT | PetScope,
+        ) -> DatabaseQuery[
+            TablesT | Literal["pet"],
+            ColumnT | PetScope,
+            NullT | Literal["pet"],
+            FieldsT,
+            StarT,
+        ]: ...
 
         @overload
         def left_join(
             self,
             table: Literal["toy"],
-            left: ColumnT | ToyColumns,
-            right: ColumnT | ToyColumns,
-        ) -> DatabaseQuery[ColumnT | ToyColumns, NullT | Literal["toy"], RowT]: ...
+            left: ColumnT | ToyScope,
+            right: ColumnT | ToyScope,
+        ) -> DatabaseQuery[
+            TablesT | Literal["toy"],
+            ColumnT | ToyScope,
+            NullT | Literal["toy"],
+            FieldsT,
+            StarT,
+        ]: ...
 
         def left_join(self, table: Any, left: Any, right: Any) -> Any:
             return self._join("left", table, left, right)
 
         @overload
         def right_join(
-            self: DatabaseQuery[
-                ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
+            self,
             table: Literal["person"],
-            left: ColumnT | PersonColumns,
-            right: ColumnT | PersonColumns,
+            left: ColumnT | PersonScope,
+            right: ColumnT | PersonScope,
         ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
+            TablesT | Literal["person"],
+            ColumnT | PersonScope,
             NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
+            FieldsT,
+            Literal["*"],
         ]: ...
 
         @overload
         def right_join(
-            self: DatabaseQuery[
-                ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
+            self,
             table: Literal["pet"],
-            left: ColumnT | PetColumns,
-            right: ColumnT | PetColumns,
+            left: ColumnT | PetScope,
+            right: ColumnT | PetScope,
         ) -> DatabaseQuery[
-            ColumnT | PetColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
+            TablesT | Literal["pet"], ColumnT | PetScope, NullT, FieldsT, Literal["*"]
         ]: ...
 
         @overload
         def right_join(
-            self: DatabaseQuery[
-                ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
+            self,
             table: Literal["toy"],
-            left: ColumnT | ToyColumns,
-            right: ColumnT | ToyColumns,
+            left: ColumnT | ToyScope,
+            right: ColumnT | ToyScope,
         ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
-            NullT,
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
+            TablesT | Literal["toy"], ColumnT | ToyScope, NullT, FieldsT, Literal["*"]
         ]: ...
 
         def right_join(self, table: Any, left: Any, right: Any) -> Any:
@@ -4198,236 +2594,1524 @@ if TYPE_CHECKING:
 
         @overload
         def full_join(
-            self: DatabaseQuery[
-                ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
+            self,
             table: Literal["person"],
-            left: ColumnT | PersonColumns,
-            right: ColumnT | PersonColumns,
+            left: ColumnT | PersonScope,
+            right: ColumnT | PersonScope,
         ) -> DatabaseQuery[
-            ColumnT | PersonColumns,
+            TablesT | Literal["person"],
+            ColumnT | PersonScope,
             NullT | Literal["person"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
+            FieldsT,
+            Literal["*"],
         ]: ...
 
         @overload
         def full_join(
-            self: DatabaseQuery[
-                ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
+            self,
             table: Literal["pet"],
-            left: ColumnT | PetColumns,
-            right: ColumnT | PetColumns,
+            left: ColumnT | PetScope,
+            right: ColumnT | PetScope,
         ) -> DatabaseQuery[
-            ColumnT | PetColumns,
+            TablesT | Literal["pet"],
+            ColumnT | PetScope,
             NullT | Literal["pet"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
+            FieldsT,
+            Literal["*"],
         ]: ...
 
         @overload
         def full_join(
-            self: DatabaseQuery[
-                ColumnT,
-                NullT,
-                DatabaseRow[
-                    IntKeys,
-                    OptIntKeys,
-                    StrKeys,
-                    OptStrKeys,
-                    StatusKeys,
-                    OptStatusKeys,
-                    SpeciesKeys,
-                    OptSpeciesKeys,
-                    DateKeys,
-                    OptDateKeys,
-                    FloatKeys,
-                    OptFloatKeys,
-                    ObjectKeys,
-                    NullRowT,
-                ],
-            ],
+            self,
             table: Literal["toy"],
-            left: ColumnT | ToyColumns,
-            right: ColumnT | ToyColumns,
+            left: ColumnT | ToyScope,
+            right: ColumnT | ToyScope,
         ) -> DatabaseQuery[
-            ColumnT | ToyColumns,
+            TablesT | Literal["toy"],
+            ColumnT | ToyScope,
             NullT | Literal["toy"],
-            DatabaseRow[
-                IntKeys,
-                OptIntKeys,
-                StrKeys,
-                OptStrKeys,
-                StatusKeys,
-                OptStatusKeys,
-                SpeciesKeys,
-                OptSpeciesKeys,
-                DateKeys,
-                OptDateKeys,
-                FloatKeys,
-                OptFloatKeys,
-                ObjectKeys,
-                Literal["*"],
-            ],
+            FieldsT,
+            Literal["*"],
         ]: ...
 
         def full_join(self, table: Any, left: Any, right: Any) -> Any:
             return self._join("full", table, left, right)
 
+    # Single-table queries. Each table gets its own class so the
+    # editor only weighs that table's overloads; joins move to
+    # DatabaseQuery.
+    class SingleTableQuery(
+        TypedSchemaQueryBuilder["DatabaseSchema", ColumnsT, FieldsT, Never],
+        Generic[TableT, ColumnsT, ScopeT, FieldsT],
+    ):
+        @overload
+        def inner_join(
+            self,
+            table: Literal["person"],
+            left: ScopeT | PersonScope,
+            right: ScopeT | PersonScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["person"], ScopeT | PersonScope, Never, FieldsT, Never
+        ]: ...
+
+        @overload
+        def inner_join(
+            self,
+            table: Literal["pet"],
+            left: ScopeT | PetScope,
+            right: ScopeT | PetScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["pet"], ScopeT | PetScope, Never, FieldsT, Never
+        ]: ...
+
+        @overload
+        def inner_join(
+            self,
+            table: Literal["toy"],
+            left: ScopeT | ToyScope,
+            right: ScopeT | ToyScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["toy"], ScopeT | ToyScope, Never, FieldsT, Never
+        ]: ...
+
+        def inner_join(self, table: Any, left: Any, right: Any) -> Any:
+            query = self._query.join("inner", table, left, right)
+            joined: DatabaseQuery[Any, Any, Any, Any, Any] = DatabaseQuery(
+                cast(Any, query.typed(DatabaseExpressionBuilder))
+            )
+            return joined
+
+        @overload
+        def left_join(
+            self,
+            table: Literal["person"],
+            left: ScopeT | PersonScope,
+            right: ScopeT | PersonScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["person"],
+            ScopeT | PersonScope,
+            Literal["person"],
+            FieldsT,
+            Never,
+        ]: ...
+
+        @overload
+        def left_join(
+            self,
+            table: Literal["pet"],
+            left: ScopeT | PetScope,
+            right: ScopeT | PetScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["pet"], ScopeT | PetScope, Literal["pet"], FieldsT, Never
+        ]: ...
+
+        @overload
+        def left_join(
+            self,
+            table: Literal["toy"],
+            left: ScopeT | ToyScope,
+            right: ScopeT | ToyScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["toy"], ScopeT | ToyScope, Literal["toy"], FieldsT, Never
+        ]: ...
+
+        def left_join(self, table: Any, left: Any, right: Any) -> Any:
+            query = self._query.join("left", table, left, right)
+            joined: DatabaseQuery[Any, Any, Any, Any, Any] = DatabaseQuery(
+                cast(Any, query.typed(DatabaseExpressionBuilder))
+            )
+            return joined
+
+        @overload
+        def right_join(
+            self,
+            table: Literal["person"],
+            left: ScopeT | PersonScope,
+            right: ScopeT | PersonScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["person"],
+            ScopeT | PersonScope,
+            Never,
+            FieldsT,
+            Literal["*"],
+        ]: ...
+
+        @overload
+        def right_join(
+            self,
+            table: Literal["pet"],
+            left: ScopeT | PetScope,
+            right: ScopeT | PetScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["pet"], ScopeT | PetScope, Never, FieldsT, Literal["*"]
+        ]: ...
+
+        @overload
+        def right_join(
+            self,
+            table: Literal["toy"],
+            left: ScopeT | ToyScope,
+            right: ScopeT | ToyScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["toy"], ScopeT | ToyScope, Never, FieldsT, Literal["*"]
+        ]: ...
+
+        def right_join(self, table: Any, left: Any, right: Any) -> Any:
+            query = self._query.join("right", table, left, right)
+            joined: DatabaseQuery[Any, Any, Any, Any, Any] = DatabaseQuery(
+                cast(Any, query.typed(DatabaseExpressionBuilder))
+            )
+            return joined
+
+        @overload
+        def full_join(
+            self,
+            table: Literal["person"],
+            left: ScopeT | PersonScope,
+            right: ScopeT | PersonScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["person"],
+            ScopeT | PersonScope,
+            Literal["person"],
+            FieldsT,
+            Literal["*"],
+        ]: ...
+
+        @overload
+        def full_join(
+            self,
+            table: Literal["pet"],
+            left: ScopeT | PetScope,
+            right: ScopeT | PetScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["pet"],
+            ScopeT | PetScope,
+            Literal["pet"],
+            FieldsT,
+            Literal["*"],
+        ]: ...
+
+        @overload
+        def full_join(
+            self,
+            table: Literal["toy"],
+            left: ScopeT | ToyScope,
+            right: ScopeT | ToyScope,
+        ) -> DatabaseQuery[
+            TableT | Literal["toy"],
+            ScopeT | ToyScope,
+            Literal["toy"],
+            FieldsT,
+            Literal["*"],
+        ]: ...
+
+        def full_join(self, table: Any, left: Any, right: Any) -> Any:
+            query = self._query.join("full", table, left, right)
+            joined: DatabaseQuery[Any, Any, Any, Any, Any] = DatabaseQuery(
+                cast(Any, query.typed(DatabaseExpressionBuilder))
+            )
+            return joined
+
+    class PersonQuery(
+        SingleTableQuery[Literal["person"], PersonColumns, PersonScope, FieldsT],
+        Generic[FieldsT],
+    ):
+        @overload
+        def select(
+            self, selections: Literal["person.id", "id"]
+        ) -> PersonQuery[Cons[Literal["id"], int, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["person.first_name", "first_name"]
+        ) -> PersonQuery[Cons[Literal["first_name"], str, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["person.last_name", "last_name"]
+        ) -> PersonQuery[Cons[Literal["last_name"], str | None, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["person.status", "status"]
+        ) -> PersonQuery[
+            Cons[Literal["status"], Literal["active", "inactive"], FieldsT]
+        ]: ...
+
+        @overload
+        def select(
+            self, selections: PersonColumns | Sequence[PersonColumns]
+        ) -> PersonQuery[Cons[str, object, FieldsT]]: ...
+
+        def select(self, selections: Any) -> Any:
+            return super().select(selections)
+
+        @overload
+        def select_as(
+            self, source: Literal["person.id", "id"], alias: AliasT
+        ) -> PersonQuery[Cons[AliasT, int, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["person.first_name", "first_name"], alias: AliasT
+        ) -> PersonQuery[Cons[AliasT, str, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["person.last_name", "last_name"], alias: AliasT
+        ) -> PersonQuery[Cons[AliasT, str | None, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["person.status", "status"], alias: AliasT
+        ) -> PersonQuery[Cons[AliasT, Literal["active", "inactive"], FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: PersonColumns, alias: str
+        ) -> PersonQuery[Cons[str, object, FieldsT]]: ...
+
+        def select_as(self, source: Any, alias: str) -> Any:
+            return self._select_as(source, alias)
+
+        @overload
+        def where(
+            self,
+            column: Literal["person.id", "id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["person.id", "id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["person.status", "status"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["active", "inactive"],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["person.status", "status"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["active", "inactive"]]
+            | tuple[Literal["active", "inactive"], ...],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["person.status", "status"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal[
+                "person.id",
+                "id",
+                "person.first_name",
+                "first_name",
+                "person.last_name",
+                "last_name",
+                "person.status",
+                "status",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self, column: Callable[[PersonExpressionBuilder], Expression[bool]]
+        ) -> PersonQuery[FieldsT]: ...
+
+        def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            if isinstance(column, str):
+                name = cast(Any, column)
+                return super().where(name, operator, value)
+            return super().where(column)
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal["person.id", "id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal["person.id", "id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal[
+                "person.first_name", "first_name", "person.last_name", "last_name"
+            ],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal["person.status", "status"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["active", "inactive"],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal["person.status", "status"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["active", "inactive"]]
+            | tuple[Literal["active", "inactive"], ...],
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal["person.status", "status"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PersonQuery[FieldsT],
+            column: Literal[
+                "person.id",
+                "id",
+                "person.first_name",
+                "first_name",
+                "person.last_name",
+                "last_name",
+                "person.status",
+                "status",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self, column: Callable[[PersonExpressionBuilder], Expression[bool]]
+        ) -> PersonQuery[FieldsT]: ...
+
+        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            return self._having(column, operator, value)
+
+        @overload
+        def order_by(
+            self, column: PersonColumns, direction: OrderDirection = "asc"
+        ) -> PersonQuery[FieldsT]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[Cons[K1, V1, RestT]],
+            column: K1,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[Cons[K1, V1, RestT]]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[Cons[K1, V1, Cons[K2, V2, RestT]]],
+            column: K2,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[Cons[K1, V1, Cons[K2, V2, RestT]]]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]]],
+            column: K3,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]]]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[
+                Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]]
+            ],
+            column: K4,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]]
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]],
+                ],
+            ],
+            column: K5,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]]]
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                    ],
+                ],
+            ],
+            column: K6,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                ],
+            ],
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            column: K7,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]],
+                    ],
+                ],
+            ],
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PersonQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4,
+                                V4,
+                                Cons[
+                                    K5,
+                                    V5,
+                                    Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            column: K8,
+            direction: OrderDirection = "asc",
+        ) -> PersonQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[
+                            K4,
+                            V4,
+                            Cons[
+                                K5, V5, Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]: ...
+
+        def order_by(self, column: Any, direction: Any = "asc") -> Any:
+            return self._order_by(column, direction)
+
+    class PetQuery(
+        SingleTableQuery[Literal["pet"], PetColumns, PetScope, FieldsT],
+        Generic[FieldsT],
+    ):
+        @overload
+        def select(
+            self, selections: Literal["pet.id", "id"]
+        ) -> PetQuery[Cons[Literal["id"], int, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["pet.owner_id", "owner_id"]
+        ) -> PetQuery[Cons[Literal["owner_id"], int, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["pet.name", "name"]
+        ) -> PetQuery[Cons[Literal["name"], str, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["pet.species", "species"]
+        ) -> PetQuery[
+            Cons[Literal["species"], Literal["cat", "dog", "hamster"], FieldsT]
+        ]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["pet.born", "born"]
+        ) -> PetQuery[Cons[Literal["born"], date | None, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: PetColumns | Sequence[PetColumns]
+        ) -> PetQuery[Cons[str, object, FieldsT]]: ...
+
+        def select(self, selections: Any) -> Any:
+            return super().select(selections)
+
+        @overload
+        def select_as(
+            self,
+            source: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            alias: AliasT,
+        ) -> PetQuery[Cons[AliasT, int, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["pet.name", "name"], alias: AliasT
+        ) -> PetQuery[Cons[AliasT, str, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["pet.species", "species"], alias: AliasT
+        ) -> PetQuery[Cons[AliasT, Literal["cat", "dog", "hamster"], FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["pet.born", "born"], alias: AliasT
+        ) -> PetQuery[Cons[AliasT, date | None, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: PetColumns, alias: str
+        ) -> PetQuery[Cons[str, object, FieldsT]]: ...
+
+        def select_as(self, source: Any, alias: str) -> Any:
+            return self._select_as(source, alias)
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.name", "name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.name", "name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.name", "name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.species", "species"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["cat", "dog", "hamster"],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.species", "species"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["cat", "dog", "hamster"]]
+            | tuple[Literal["cat", "dog", "hamster"], ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.species", "species"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.born", "born"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: date,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["pet.born", "born"],
+            operator: Literal["in", "not in"],
+            value: list[date] | tuple[date, ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal[
+                "pet.id",
+                "id",
+                "pet.owner_id",
+                "owner_id",
+                "pet.name",
+                "name",
+                "pet.species",
+                "species",
+                "pet.born",
+                "born",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self, column: Callable[[PetExpressionBuilder], Expression[bool]]
+        ) -> PetQuery[FieldsT]: ...
+
+        def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            if isinstance(column, str):
+                name = cast(Any, column)
+                return super().where(name, operator, value)
+            return super().where(column)
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.name", "name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.name", "name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.name", "name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.species", "species"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: Literal["cat", "dog", "hamster"],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.species", "species"],
+            operator: Literal["in", "not in"],
+            value: list[Literal["cat", "dog", "hamster"]]
+            | tuple[Literal["cat", "dog", "hamster"], ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.species", "species"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.born", "born"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: date,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal["pet.born", "born"],
+            operator: Literal["in", "not in"],
+            value: list[date] | tuple[date, ...],
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: PetQuery[FieldsT],
+            column: Literal[
+                "pet.id",
+                "id",
+                "pet.owner_id",
+                "owner_id",
+                "pet.name",
+                "name",
+                "pet.species",
+                "species",
+                "pet.born",
+                "born",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self, column: Callable[[PetExpressionBuilder], Expression[bool]]
+        ) -> PetQuery[FieldsT]: ...
+
+        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            return self._having(column, operator, value)
+
+        @overload
+        def order_by(
+            self, column: PetColumns, direction: OrderDirection = "asc"
+        ) -> PetQuery[FieldsT]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[Cons[K1, V1, RestT]],
+            column: K1,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[Cons[K1, V1, RestT]]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[Cons[K1, V1, Cons[K2, V2, RestT]]],
+            column: K2,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[Cons[K1, V1, Cons[K2, V2, RestT]]]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]]],
+            column: K3,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]]]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[
+                Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]]
+            ],
+            column: K4,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]]
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]],
+                ],
+            ],
+            column: K5,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]]]
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                    ],
+                ],
+            ],
+            column: K6,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                ],
+            ],
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            column: K7,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]],
+                    ],
+                ],
+            ],
+        ]: ...
+
+        @overload
+        def order_by(
+            self: PetQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4,
+                                V4,
+                                Cons[
+                                    K5,
+                                    V5,
+                                    Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            column: K8,
+            direction: OrderDirection = "asc",
+        ) -> PetQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[
+                            K4,
+                            V4,
+                            Cons[
+                                K5, V5, Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]: ...
+
+        def order_by(self, column: Any, direction: Any = "asc") -> Any:
+            return self._order_by(column, direction)
+
+    class ToyQuery(
+        SingleTableQuery[Literal["toy"], ToyColumns, ToyScope, FieldsT],
+        Generic[FieldsT],
+    ):
+        @overload
+        def select(
+            self, selections: Literal["toy.id", "id"]
+        ) -> ToyQuery[Cons[Literal["id"], int, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["toy.pet_id", "pet_id"]
+        ) -> ToyQuery[Cons[Literal["pet_id"], int, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["toy.name", "name"]
+        ) -> ToyQuery[Cons[Literal["name"], str, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: Literal["toy.price", "price"]
+        ) -> ToyQuery[Cons[Literal["price"], float, FieldsT]]: ...
+
+        @overload
+        def select(
+            self, selections: ToyColumns | Sequence[ToyColumns]
+        ) -> ToyQuery[Cons[str, object, FieldsT]]: ...
+
+        def select(self, selections: Any) -> Any:
+            return super().select(selections)
+
+        @overload
+        def select_as(
+            self, source: Literal["toy.id", "id", "toy.pet_id", "pet_id"], alias: AliasT
+        ) -> ToyQuery[Cons[AliasT, int, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["toy.name", "name"], alias: AliasT
+        ) -> ToyQuery[Cons[AliasT, str, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: Literal["toy.price", "price"], alias: AliasT
+        ) -> ToyQuery[Cons[AliasT, float, FieldsT]]: ...
+
+        @overload
+        def select_as(
+            self, source: ToyColumns, alias: str
+        ) -> ToyQuery[Cons[str, object, FieldsT]]: ...
+
+        def select_as(self, source: Any, alias: str) -> Any:
+            return self._select_as(source, alias)
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.name", "name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.name", "name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.name", "name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.price", "price"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: float,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal["toy.price", "price"],
+            operator: Literal["in", "not in"],
+            value: list[float] | tuple[float, ...],
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self,
+            column: Literal[
+                "toy.id",
+                "id",
+                "toy.pet_id",
+                "pet_id",
+                "toy.name",
+                "name",
+                "toy.price",
+                "price",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def where(
+            self, column: Callable[[ToyExpressionBuilder], Expression[bool]]
+        ) -> ToyQuery[FieldsT]: ...
+
+        def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            if isinstance(column, str):
+                name = cast(Any, column)
+                return super().where(name, operator, value)
+            return super().where(column)
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.name", "name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.name", "name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.name", "name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.price", "price"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: float,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal["toy.price", "price"],
+            operator: Literal["in", "not in"],
+            value: list[float] | tuple[float, ...],
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self: ToyQuery[FieldsT],
+            column: Literal[
+                "toy.id",
+                "id",
+                "toy.pet_id",
+                "pet_id",
+                "toy.name",
+                "name",
+                "toy.price",
+                "price",
+            ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def having(
+            self, column: Callable[[ToyExpressionBuilder], Expression[bool]]
+        ) -> ToyQuery[FieldsT]: ...
+
+        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
+            return self._having(column, operator, value)
+
+        @overload
+        def order_by(
+            self, column: ToyColumns, direction: OrderDirection = "asc"
+        ) -> ToyQuery[FieldsT]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[Cons[K1, V1, RestT]],
+            column: K1,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[Cons[K1, V1, RestT]]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[Cons[K1, V1, Cons[K2, V2, RestT]]],
+            column: K2,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[Cons[K1, V1, Cons[K2, V2, RestT]]]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]]],
+            column: K3,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, RestT]]]]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[
+                Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]]
+            ],
+            column: K4,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, RestT]]]]
+        ]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]],
+                ],
+            ],
+            column: K5,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[
+            Cons[K1, V1, Cons[K2, V2, Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, RestT]]]]]
+        ]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                    ],
+                ],
+            ],
+            column: K6,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[K3, V3, Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, RestT]]]],
+                ],
+            ],
+        ]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            column: K7,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[K4, V4, Cons[K5, V5, Cons[K6, V6, Cons[K7, V7, RestT]]]],
+                    ],
+                ],
+            ],
+        ]: ...
+
+        @overload
+        def order_by(
+            self: ToyQuery[
+                Cons[
+                    K1,
+                    V1,
+                    Cons[
+                        K2,
+                        V2,
+                        Cons[
+                            K3,
+                            V3,
+                            Cons[
+                                K4,
+                                V4,
+                                Cons[
+                                    K5,
+                                    V5,
+                                    Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            column: K8,
+            direction: OrderDirection = "asc",
+        ) -> ToyQuery[
+            Cons[
+                K1,
+                V1,
+                Cons[
+                    K2,
+                    V2,
+                    Cons[
+                        K3,
+                        V3,
+                        Cons[
+                            K4,
+                            V4,
+                            Cons[
+                                K5, V5, Cons[K6, V6, Cons[K7, V7, Cons[K8, V8, RestT]]]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]: ...
+
+        def order_by(self, column: Any, direction: Any = "asc") -> Any:
+            return self._order_by(column, direction)
+
     # Typed client. `Database(schema=...)` builds and returns this.
     class DatabaseClient(Pysely["DatabaseSchema"]):
         @overload
-        def select_from(
-            self, table: Literal["person"]
-        ) -> DatabaseQuery[
-            PersonColumns,
-            Never,
-            DatabaseRow[
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-            ],
-        ]: ...
+        def select_from(self, table: Literal["person"]) -> PersonQuery[Nil]: ...
 
         @overload
-        def select_from(
-            self, table: Literal["pet"]
-        ) -> DatabaseQuery[
-            PetColumns,
-            Never,
-            DatabaseRow[
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-            ],
-        ]: ...
+        def select_from(self, table: Literal["pet"]) -> PetQuery[Nil]: ...
 
         @overload
-        def select_from(
-            self, table: Literal["toy"]
-        ) -> DatabaseQuery[
-            ToyColumns,
-            Never,
-            DatabaseRow[
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-                Never,
-            ],
-        ]: ...
+        def select_from(self, table: Literal["toy"]) -> ToyQuery[Nil]: ...
 
         def select_from(self, table: str) -> Any:
-            query = super().select_from(table)
-            builder = DatabaseExpressionBuilder
-            return DatabaseQuery(query.with_types(DatabaseRow, builder))
+            query_class, builder = _QUERIES[table]
+            query = super().select_from(table).typed(builder)
+            return query_class(cast(Any, query))
 
 else:
     # Runtime twins of the typed classes: no overloads, so importing
     # this module costs the same for any schema size.
-    class DatabaseRow(Row):
-        pass
-
     class DatabaseExpressionBuilder(ExpressionBuilder):
         pass
 
     class DatabaseQuery(TypedSchemaQueryBuilder):
         def select_as(self, source, alias):
             return self._select_as(source, alias)
+
+        def having(self, column, operator=None, value=None):
+            return self._having(column, operator, value)
+
+        def order_by(self, column, direction="asc"):
+            return self._order_by(column, direction)
 
         def inner_join(self, table, left, right):
             return self._join("inner", table, left, right)
@@ -4441,11 +4125,63 @@ else:
         def full_join(self, table, left, right):
             return self._join("full", table, left, right)
 
+    class SingleTableQuery(TypedSchemaQueryBuilder):
+        def select_as(self, source, alias):
+            return self._select_as(source, alias)
+
+        def having(self, column, operator=None, value=None):
+            return self._having(column, operator, value)
+
+        def order_by(self, column, direction="asc"):
+            return self._order_by(column, direction)
+
+        def inner_join(self, table, left, right):
+            query = self._query.join("inner", table, left, right)
+            return DatabaseQuery(query.typed(DatabaseExpressionBuilder))
+
+        def left_join(self, table, left, right):
+            query = self._query.join("left", table, left, right)
+            return DatabaseQuery(query.typed(DatabaseExpressionBuilder))
+
+        def right_join(self, table, left, right):
+            query = self._query.join("right", table, left, right)
+            return DatabaseQuery(query.typed(DatabaseExpressionBuilder))
+
+        def full_join(self, table, left, right):
+            query = self._query.join("full", table, left, right)
+            return DatabaseQuery(query.typed(DatabaseExpressionBuilder))
+
+    class PersonExpressionBuilder(ExpressionBuilder):
+        pass
+
+    class PersonQuery(SingleTableQuery):
+        pass
+
+    class PetExpressionBuilder(ExpressionBuilder):
+        pass
+
+    class PetQuery(SingleTableQuery):
+        pass
+
+    class ToyExpressionBuilder(ExpressionBuilder):
+        pass
+
+    class ToyQuery(SingleTableQuery):
+        pass
+
     class DatabaseClient(Pysely):
         def select_from(self, table):
-            query = super().select_from(table)
-            builder = DatabaseExpressionBuilder
-            return DatabaseQuery(query.with_types(DatabaseRow, builder))
+            query_class, builder = _QUERIES[table]
+            query = super().select_from(table).typed(builder)
+            return query_class(query)
+
+
+# The query and expression-builder classes behind each table name.
+_QUERIES: dict[str, tuple[type[Any], type[Any]]] = {
+    "person": (PersonQuery, PersonExpressionBuilder),
+    "pet": (PetQuery, PetExpressionBuilder),
+    "toy": (ToyQuery, ToyExpressionBuilder),
+}
 
 
 # Schema class. Pass it to `Database`; its base names the client.

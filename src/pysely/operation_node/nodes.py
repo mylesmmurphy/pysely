@@ -83,11 +83,31 @@ class JoinNode:
 
 
 @dataclass(frozen=True, slots=True)
+class OrderByItemNode:
+    expression: OperationNode
+    direction: Literal["asc", "desc"] = "asc"
+
+
+@dataclass(frozen=True, slots=True)
+class SetOperationNode:
+    """``union``/``intersect``/``except`` with the query that follows."""
+
+    operator: Literal["union", "union all", "intersect", "except"]
+    query: SelectQueryNode
+
+
+@dataclass(frozen=True, slots=True)
 class SelectQueryNode:
     from_: tuple[TableNode, ...] = ()
     selections: tuple[OperationNode, ...] = ()
     where: OperationNode | None = None
     joins: tuple[JoinNode, ...] = ()
+    group_by: tuple[OperationNode, ...] = ()
+    having: OperationNode | None = None
+    order_by: tuple[OrderByItemNode, ...] = ()
+    limit: int | None = None
+    offset: int | None = None
+    set_operations: tuple[SetOperationNode, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +148,8 @@ OperationNode: TypeAlias = (
     | SelectAllNode
     | SelectQueryNode
     | JoinNode
+    | OrderByItemNode
+    | SetOperationNode
     | InsertQueryNode
     | UpdateQueryNode
     | DeleteQueryNode

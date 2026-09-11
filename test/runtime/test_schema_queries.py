@@ -17,7 +17,7 @@ from pysely import (
 )
 from pysely.operation_node import OperationNodeTransformer, OperationNodeVisitor
 from test.fixtures.dialects import _unavailable_database
-from test.fixtures.schema import DatabaseClient, DatabaseRow, schema
+from test.fixtures.schema import DatabaseClient, schema
 
 
 class PersonTable:
@@ -242,7 +242,7 @@ async def test_typed_client_returns_generated_rows(tmp_path: Path) -> None:
         rows = await query.execute()
         first = await query.execute_take_first()
         only = await query.execute_take_first_or_throw()
-    assert [type(row) for row in rows] == [DatabaseRow]
+    assert [type(row) for row in rows] == [Row]
     assert isinstance(only, Row) and first == only
     row = rows[0]
     assert (
@@ -270,7 +270,7 @@ async def test_typed_client_returns_generated_rows(tmp_path: Path) -> None:
         "last_name": None,
         "given": "Jennifer",
     }
-    assert repr(row).startswith("DatabaseRow({")
+    assert repr(row).startswith("Row({")
     with pytest.raises(KeyError):
         row["missing"]
     with pytest.raises(TypeError):
@@ -351,3 +351,96 @@ async def test_string_query_in_transaction_and_connection_scope(tmp_path: Path) 
                 {"id": 1}
             ]
     assert rows == [{"first_name": "Jennifer", "pet_name": "Fido"}]
+
+
+def test_ordering_paging_grouping_and_set_operations_compile() -> None:
+    db = generated()
+    person = db.select_from("person")
+    compiled = (
+        person.select("status")
+        .select_as("person.id", "pid")
+        .group_by(["status", "person.id"])
+        .having("status", "=", "active")
+        .order_by("pid", "desc")
+        .order_by("first_name")
+        .limit(10)
+        .offset(5)
+        .compile()
+    )
+    assert compiled.sql == (
+        'select "status", "person"."id" as "pid" from "person" '
+        'group by "status", "person"."id" having "status" = $1 '
+        'order by "pid" desc, "first_name" asc limit $2 offset $3'
+    )
+    assert compiled.parameters == ("active", 10, 5)
+    union = (
+        person.select("first_name")
+        .union(db.select_from("pet").select_as("name", "first_name"))
+        .union_all(person.select_as("first_name", "first_name"))
+        .order_by("first_name")
+        .compile()
+    )
+    assert union.sql == (
+        'select "first_name" from "person" '
+        'union select "name" as "first_name" from "pet" '
+        'union all select "first_name" as "first_name" from "person" '
+        'order by "first_name" asc'
+    )
+    assert OperationNodeTransformer().transform(union.query) == union.query
+    OperationNodeVisitor().visit(union.query)
+    with pytest.raises(InvalidQueryError, match="Unknown column"):
+        person.select("first_name").order_by("nickname")
+    with pytest.raises(InvalidQueryError, match="order direction"):
+        person.select("first_name").order_by("first_name", "sideways")  # type: ignore[arg-type]
+    with pytest.raises(InvalidQueryError, match="non-negative"):
+        person.select("first_name").limit(-1)
+    with pytest.raises(InvalidQueryError, match="same number"):
+        person.select("first_name").union(db.select_from("pet").select(["id", "name"]))
+
+
+def test_limit_styles_follow_the_dialect() -> None:
+    from pysely import MssqlDialect
+
+    mssql = Pysely(schema=schema, dialect=MssqlDialect())
+    paged = mssql.select_from("person").select("first_name").order_by("first_name")
+    assert paged.limit(5).offset(10).compile().sql == (
+        "select [first_name] from [person] order by [first_name] asc "
+        "offset ? rows fetch next ? rows only"
+    )
+    with pytest.raises(UnsupportedFeatureError, match="order_by"):
+        mssql.select_from("person").select("first_name").limit(5).compile()
+
+
+async def test_ordering_paging_and_set_operations_execute(tmp_path: Path) -> None:
+    database = await aiosqlite.connect(tmp_path / "order.db", isolation_level=None)
+    await database.executescript(SQLITE_FIXTURE)
+    async with make_database(
+        schema=schema, dialect=SqliteDialect(database=database)
+    ) as db:
+        person = db.select_from("person")
+        ordered = (
+            await person.select("first_name").order_by("first_name", "desc").execute()
+        )
+        paged = (
+            await person.select("first_name")
+            .order_by("id")
+            .limit(1)
+            .offset(1)
+            .execute()
+        )
+        grouped = await (
+            person.select("status")
+            .group_by("status")
+            .having("status", "=", "active")
+            .execute()
+        )
+        names = await (
+            person.select("first_name")
+            .union(db.select_from("pet").select_as("name", "first_name"))
+            .order_by("first_name")
+            .execute()
+        )
+    assert [row["first_name"] for row in ordered] == ["Jennifer", "Bob"]
+    assert [row["first_name"] for row in paged] == ["Bob"]
+    assert [row.to_dict() for row in grouped] == [{"status": "active"}]
+    assert [row["first_name"] for row in names] == ["Bob", "Fido", "Jennifer", "Stray"]

@@ -41,7 +41,9 @@ class SqliteDialect(Dialect):
 
 class MssqlDialect(Dialect):
     def __init__(self, *, driver: Driver | None = None) -> None:
-        profile = BindingProfile("mssql-aioodbc", "?", "[", "]", "output")
+        profile = BindingProfile(
+            "mssql-aioodbc", "?", "[", "]", "output", limit_style="fetch"
+        )
         super().__init__(profile, driver)
 
 

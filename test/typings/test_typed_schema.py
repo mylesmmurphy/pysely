@@ -132,6 +132,20 @@ def send(process: subprocess.Popen[bytes], message: dict[str, Any]) -> None:
     process.stdin.flush()
 
 
+def read_exactly(process: subprocess.Popen[bytes], size: int) -> bytes:
+    """Unbuffered pipes return short reads; a large response spans several."""
+    assert process.stdout is not None
+    chunks: list[bytes] = []
+    remaining = size
+    while remaining > 0:
+        chunk = process.stdout.read(remaining)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
 def receive(process: subprocess.Popen[bytes], request_id: int) -> dict[str, Any]:
     assert process.stdout is not None
     while select.select([process.stdout], [], [], 20)[0]:
@@ -141,7 +155,7 @@ def receive(process: subprocess.Popen[bytes], request_id: int) -> dict[str, Any]
                 break
             name, value = line.split(":", 1)
             headers[name.lower()] = value.strip()
-        response = json.loads(process.stdout.read(int(headers["content-length"])))
+        response = json.loads(read_exactly(process, int(headers["content-length"])))
         if response.get("id") == request_id:
             return response
     raise AssertionError("Pyright language server did not respond")

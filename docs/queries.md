@@ -63,7 +63,54 @@ reference_query = query.where_ref("person.id", "=", "pet.owner_id")
 
 The expression builder uses the columns in the current query scope, so its string
 arguments receive the same completion and type checking as `.where()`. Use
-`.where_ref()` when both sides of a comparison are columns.
+`.where_ref()` when both sides of a comparison are columns; `eb.not_()` and
+`eb.ref()` are also available inside a callback.
+
+Operators take different value shapes: comparisons bind the column's type,
+`is`/`is not` take `None`, `like`/`not like` take a string on string columns,
+and `in`/`not in` take a list or tuple.
+
+## Joins
+
+```python
+query = (
+    db.select_from("person")
+    .left_join("pet", "pet.owner_id", "person.id")
+    .select("first_name")
+    .select("pet.name")  # str | None: the pet may be missing
+)
+```
+
+`inner_join`, `left_join`, `right_join` and `full_join` take the table and the
+two ON columns. After a left join the joined table's columns read as
+nullable; after a right or full join every column does. MySQL has no full
+join. Rows are immutable mappings; use `row.to_dict()` for a dictionary.
+
+## Ordering, paging, grouping and set operations
+
+```python
+query = (
+    db.select_from("person")
+    .select("status")
+    .select_as("person.id", "pid")
+    .group_by("status")
+    .having("status", "!=", "inactive")
+    .order_by("pid", "desc")
+    .limit(10)
+    .offset(20)
+)
+names = (
+    db.select_from("person")
+    .select("first_name")
+    .union(db.select_from("pet").select_as("name", "first_name"))
+)
+```
+
+- `order_by` accepts a column in scope or the alias of a selected field.
+- `having` takes the same arguments as `where`.
+- `union`, `union_all`, `intersect` and `except_` require the other query to
+  select the same keys with the same types.
+- SQL Server pages with `offset ... fetch`, which requires `order_by`.
 
 ## Insert
 

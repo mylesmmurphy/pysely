@@ -9,43 +9,21 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal, Never, TypeVar, assert_type
 
-from pysely import Database
+from pysely import Cons, Database, Nil
 from test.fixtures.dialects import postgres_dialect
 from test.fixtures.schema import (
     DatabaseClient,
     DatabaseQuery,
-    DatabaseRow,
-    PersonColumns,
-    PetColumns,
+    PersonQuery,
+    PersonScope,
+    PetScope,
     schema,
 )
 
 db = Database(schema=schema, dialect=postgres_dialect())
 assert_type(db, DatabaseClient)
 person = db.select_from("person")
-assert_type(
-    person,
-    DatabaseQuery[
-        PersonColumns,
-        Never,
-        DatabaseRow[
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-        ],
-    ],
-)
+assert_type(person, PersonQuery[Nil])
 
 # --- bare names: unique in the database, or the only table in scope
 person.select("first_name")
@@ -58,24 +36,11 @@ joined = person.inner_join("pet", "owner_id", "person.id")
 assert_type(
     joined.select("pet.id"),
     DatabaseQuery[
-        PersonColumns | PetColumns,
+        Literal["person", "pet"],
+        PersonScope | PetScope,
         Never,
-        DatabaseRow[
-            Literal["id"],
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-            Never,
-        ],
+        Cons[Literal["id"], int, Nil],
+        Never,
     ],
 )
 three = joined.inner_join("toy", "toy.pet_id", "pet.id")
@@ -155,14 +120,14 @@ async def outer() -> None:
     assert_type(mixed["toy_name"], str)
 
 
-# --- list projections keep scope checks and fall back to object values
+# --- list projections keep scope checks; every key of that row reads as object
 async def lists(names: list[Literal["first_name", "last_name"]]) -> None:
     listed = await (
         person.select("person.id")
         .select(["first_name", "last_name"])
         .execute_take_first_or_throw()
     )
-    assert_type(listed["id"], int)
+    assert_type(listed["id"], object)
     assert_type(listed["first_name"], object)
     assert_type(listed["anything"], object)
     person.select(("first_name", "status"))
@@ -193,20 +158,24 @@ joined.where(
 person.where(lambda eb: eb("id", ">", 0))
 
 
-# --- helpers name the exact scope they need; the row type flows through
+# --- helpers: single-table queries carry their table class; joined queries
+# name the tables they need
+FieldsT = TypeVar("FieldsT")
 NullT = TypeVar("NullT", bound=str)
-RowT = TypeVar("RowT")
+StarT = TypeVar("StarT", bound=str)
 
 
-def active_only(
-    query: DatabaseQuery[PersonColumns, NullT, RowT],
-) -> DatabaseQuery[PersonColumns, NullT, RowT]:
+def active_only(query: PersonQuery[FieldsT]) -> PersonQuery[FieldsT]:
     return query.where("status", "=", "active")
 
 
 def dogs_only(
-    query: DatabaseQuery[PersonColumns | PetColumns, NullT, RowT],
-) -> DatabaseQuery[PersonColumns | PetColumns, NullT, RowT]:
+    query: DatabaseQuery[
+        Literal["person", "pet"], PersonScope | PetScope, NullT, FieldsT, StarT
+    ],
+) -> DatabaseQuery[
+    Literal["person", "pet"], PersonScope | PetScope, NullT, FieldsT, StarT
+]:
     return query.where("species", "=", "dog")
 
 
@@ -230,3 +199,35 @@ async def branches() -> None:
     b = await branch_b.execute_take_first_or_throw()
     assert_type(a["last_name"], str | None)
     assert_type(b["id"], int)
+
+
+# --- ordering, paging, grouping and set operations
+person.select("first_name").order_by("last_name").order_by("id", "desc")
+person.select("first_name").select_as("person.id", "pid").order_by("pid", "desc")
+joined.select("pet.name").order_by("person.id").order_by("name")
+person.select("id").limit(10).offset(20)
+person.select("status").group_by("status").having("status", "=", "active")
+joined.select("species").group_by(["species", "person.id"]).having(
+    lambda eb: eb("species", "in", ["cat", "dog"])
+)
+person.select("first_name").union(person.select_as("person.first_name", "first_name"))
+person.select("first_name").union_all(
+    db.select_from("pet").select_as("name", "first_name")
+)
+
+
+async def paged() -> None:
+    row = await (
+        person.select("first_name")
+        .select_as("person.id", "pid")
+        .order_by("pid")
+        .limit(1)
+        .execute_take_first_or_throw()
+    )
+    assert_type(row["pid"], int)
+    united = await (
+        person.select("first_name")
+        .union(db.select_from("pet").select_as("name", "first_name"))
+        .execute()
+    )
+    assert_type(united[0]["first_name"], str)

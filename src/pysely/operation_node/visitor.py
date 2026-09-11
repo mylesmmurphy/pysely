@@ -11,10 +11,12 @@ from .nodes import (
     JoinNode,
     NotNode,
     OperationNode,
+    OrderByItemNode,
     OrNode,
     ReferenceNode,
     SelectAllNode,
     SelectQueryNode,
+    SetOperationNode,
     TableNode,
     UpdateQueryNode,
     ValueListNode,
@@ -85,6 +87,20 @@ class OperationNodeVisitor:
             self.visit(selection)
         if node.where:
             self.visit(node.where)
+        for expression in node.group_by:
+            self.visit(expression)
+        if node.having:
+            self.visit(node.having)
+        for item in node.order_by:
+            self.visit(item)
+        for operation in node.set_operations:
+            self.visit(operation)
+
+    def visit_OrderByItemNode(self, node: OrderByItemNode) -> None:
+        self.visit(node.expression)
+
+    def visit_SetOperationNode(self, node: SetOperationNode) -> None:
+        self.visit(node.query)
 
     def visit_JoinNode(self, node: JoinNode) -> None:
         self.visit(node.table)

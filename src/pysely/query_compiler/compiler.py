@@ -15,6 +15,7 @@ from pysely.operation_node import (
     IsNullNode,
     NotNode,
     OperationNode,
+    OrderByItemNode,
     OrNode,
     ReferenceNode,
     RootOperationNode,
@@ -38,6 +39,8 @@ class BindingProfile:
     returning_style: str | None = "returning"
     supports_right_join: bool = True
     supports_full_join: bool = True
+    limit_style: str = "limit"
+    """``limit``: ``limit n offset m``; ``fetch``: ``offset m rows fetch next``."""
 
     def bind(self, position: int) -> str:
         return self.placeholder.format(position=position)
@@ -111,7 +114,42 @@ class QueryCompiler:
             )
         if node.where:
             sql += " where " + self._compile(node.where)
+        if node.group_by:
+            sql += " group by " + ", ".join(self._compile(e) for e in node.group_by)
+        if node.having:
+            sql += " having " + self._compile(node.having)
+        for operation in node.set_operations:
+            sql += f" {operation.operator} {self._compile_select(operation.query)}"
+        if node.order_by:
+            sql += " order by " + ", ".join(
+                f"{self._compile(item.expression)} {item.direction}"
+                for item in node.order_by
+            )
+        sql += self._limit_clause(node)
         return sql
+
+    def _limit_clause(self, node: SelectQueryNode) -> str:
+        if node.limit is None and node.offset is None:
+            return ""
+        if self.profile.limit_style == "fetch":
+            if not node.order_by:
+                raise UnsupportedFeatureError(
+                    f"{self.profile.name} requires order_by() with limit/offset"
+                )
+            sql = f" offset {self._bind(node.offset or 0)} rows"
+            if node.limit is not None:
+                sql += f" fetch next {self._bind(node.limit)} rows only"
+            return sql
+        sql = ""
+        if node.limit is not None:
+            sql += f" limit {self._bind(node.limit)}"
+        if node.offset is not None:
+            sql += f" offset {self._bind(node.offset)}"
+        return sql
+
+    def _bind(self, value: object) -> str:
+        self._parameters.append(value)
+        return self.profile.bind(len(self._parameters))
 
     def _compile_insert(self, node: InsertQueryNode) -> str:
         if not node.columns or not node.values:
@@ -236,6 +274,8 @@ class QueryCompiler:
             return f"{table}.*"
         if isinstance(node, SelectQueryNode):
             return f"({self._compile_select(node)})"
+        if isinstance(node, OrderByItemNode):
+            return f"{self._compile(node.expression)} {node.direction}"
         raise TypeError(f"Unsupported nested operation node: {type(node).__name__}")
 
     def _quote(self, identifier: str) -> str:

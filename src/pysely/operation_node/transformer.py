@@ -15,10 +15,12 @@ from .nodes import (
     JoinNode,
     NotNode,
     OperationNode,
+    OrderByItemNode,
     OrNode,
     ReferenceNode,
     SelectAllNode,
     SelectQueryNode,
+    SetOperationNode,
     TableNode,
     UpdateQueryNode,
     ValueListNode,
@@ -105,7 +107,22 @@ class OperationNodeTransformer:
             selections=tuple(self.transform(item) for item in node.selections),
             where=self.transform(node.where) if node.where else None,
             joins=tuple(cast(JoinNode, self.transform(join)) for join in node.joins),
+            group_by=tuple(self.transform(item) for item in node.group_by),
+            having=self.transform(node.having) if node.having else None,
+            order_by=tuple(
+                cast(OrderByItemNode, self.transform(item)) for item in node.order_by
+            ),
+            set_operations=tuple(
+                cast(SetOperationNode, self.transform(item))
+                for item in node.set_operations
+            ),
         )
+
+    def transform_OrderByItemNode(self, node: OrderByItemNode) -> OperationNode:
+        return replace(node, expression=self.transform(node.expression))
+
+    def transform_SetOperationNode(self, node: SetOperationNode) -> OperationNode:
+        return replace(node, query=cast(SelectQueryNode, self.transform(node.query)))
 
     def transform_JoinNode(self, node: JoinNode) -> OperationNode:
         return replace(

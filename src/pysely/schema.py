@@ -100,6 +100,18 @@ class Schema:
             else (),
         )
 
+    def order_reference(
+        self,
+        scope: dict[str, str],
+        selections: tuple[OperationNode, ...],
+        value: str,
+    ) -> OperationNode:
+        """A column in scope, or the alias of a selection already made."""
+        for node in selections:
+            if isinstance(node, AliasNode) and node.alias.name == value:
+                return IdentifierNode(value)
+        return self.reference(scope, value)
+
     def selection(self, scope: dict[str, str], value: str) -> ReferenceNode | AliasNode:
         name, alias = split_alias(value)
         node = self.reference(scope, name)

@@ -50,15 +50,16 @@ Each line below is covered by a test that runs stock mypy 1.20 and Pyright
 | Capability | Status |
 | --- | --- |
 | Table and column completion, in scope only | Verified |
-| Unknown, unjoined or ambiguous columns in `select`, `select_as`, `where`, `where_ref`, joins and callbacks | Error |
-| `where` values checked per operator family (see below) | Verified |
-| Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | Verified |
-| `select_as` alias typed as a key | Verified for a literal alias |
+| Unknown, unjoined or ambiguous columns in `select`, `select_as`, `where`, `where_ref`, `group_by`, `having`, `order_by`, joins and callbacks | Error |
+| `where`/`having` values checked per operator family (see below) | Verified |
+| Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | Verified for the first 16 fields |
+| `select_as` alias typed as a key; `order_by` accepts selected aliases | Verified for a literal alias (aliases: first 8 fields) |
 | Left join: the joined table's keys become `X \| None` | Verified |
 | Right and full join: every key becomes `X \| None` | Verified (conservative) |
-| `.select([...])` lists | Scope-checked; keys read as `object` |
+| `union`/`union_all`/`intersect`/`except_` require the same selected shape | Verified |
+| `.select([...])` lists | Scope-checked; every key of that row reads as `object` |
 | Typed string writes | Not yet |
-| Table aliases (`"person as p"`) | Runtime only |
+| Table aliases (`"person as p"`), CTEs | Runtime only / not yet |
 | PyCharm | Not verified |
 
 ## Names
@@ -86,10 +87,22 @@ The same rules apply inside `where(lambda eb: ...)`; `eb.and_`, `eb.or_`,
 
 ## Rows
 
-Typed queries return `DatabaseRow` instances: immutable mappings with
-per-key value types. `dict(row)` and `**row` do not type-check because the
-row rejects unknown keys statically; use `row.to_dict()`. Selecting the same
-output name twice is a runtime error (`select_as` to disambiguate).
+Typed queries return `pysely.Row` instances: immutable mappings whose static
+type lists the selected fields newest first
+(`Row[Cons[Literal["id"], int, Cons[Literal["name"], str, Nil]], Never]`).
+Lookups are typed for the 16 most recent fields; beyond that a key reads as
+`object`. `dict(row)` and `**row` do not type-check because the row rejects
+unknown keys statically; use `row.to_dict()`. Selecting the same output name
+twice is a runtime error (`select_as` to disambiguate); statically the newer
+field wins.
+
+## Query classes
+
+`select_from("person")` returns `PersonQuery`, which only carries that table's
+overloads, so single-table completions stay fast however large the schema.
+Any join returns `DatabaseQuery`, which carries every table's overloads; its
+completion latency grows with the total column count (see
+[Performance](#performance)).
 
 ## Known boundaries
 
@@ -112,9 +125,18 @@ Each has a reproducer in `test/typings`.
   `list[str]` for a list literal.
 - **Dynamic table names** (`select_from(table)` with `table: str`) are a
   static error; use the untyped `Pysely` client for those.
-- **Helpers** must name the scope they need
-  (`DatabaseQuery[PersonColumns, NullT, RowT]`); `ColumnT | PersonColumns`
+- **Helpers** take the concrete query class (`PersonQuery[FieldsT]`) or name
+  the joined tables (`DatabaseQuery[Literal["person", "pet"], PersonScope |
+  PetScope, NullT, FieldsT, StarT]`); `ColumnT | PersonColumns`-style
   parameters are solved inconsistently by the two checkers.
+- **mypy time** grows with row depth: a lookup on a row with 16 fields takes
+  about two seconds in mypy 1.20. Pyright is unaffected.
+
+## Performance
+
+Measured with `scripts/benchmark_typing.py` on synthetic schemas (10-30
+columns per table, six shared column names). See the numbers in
+[ADR 0006](adr/0006-generated-typed-interfaces.md).
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

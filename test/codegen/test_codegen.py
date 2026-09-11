@@ -75,38 +75,21 @@ def test_shared_bare_names_are_scope_specific() -> None:
     assert model.references(person, "name") == ["person.name", "name"]
     generated = generate(SCHEMA)
     # ...but a single-table query still accepts the bare name.
-    assert (
-        "self: DatabaseQuery[\n                PersonColumns,\n                Never,"
-        in generated
-    )
-    assert 'selections: Literal["id"],' in generated
+    assert 'self, selections: Literal["person.id", "id"]' in generated
 
 
-def test_one_key_group_per_value_type_plus_nullable_forms() -> None:
-    model = parse_schema(SCHEMA)
-    assert [(group.name, group.value) for group in model.groups] == [
-        ("IntKeys", "int"),
-        ("OptIntKeys", "int | None"),
-        ("StrKeys", "str"),
-        ("OptStrKeys", "str | None"),
-        ("StatusKeys", 'Literal["active", "inactive"]'),
-        ("OptStatusKeys", 'Literal["active", "inactive"] | None'),
-        ("SpeciesKeys", 'Literal["cat", "dog"]'),
-        ("OptSpeciesKeys", 'Literal["cat", "dog"] | None'),
-        ("FloatKeys", "float"),
-        ("OptFloatKeys", "float | None"),
-        ("ObjectKeys", "object"),
-    ]
-
-
-def test_group_names_do_not_collide() -> None:
-    source = SCHEMA.replace(
-        'status: Literal["active", "inactive"]', "status: int\n    kind: Literal['a']"
-    ).replace('species: Literal["cat", "dog"]', "kind: Literal['b']")
-    names = [group.name for group in parse_schema(source).groups]
-    assert "KindKeys" in names
-    assert "Kind2Keys" in names
-    assert len(names) == len(set(names))
+def test_generates_a_query_class_per_table_and_a_joined_class() -> None:
+    generated = generate(SCHEMA)
+    assert "class PersonQuery(" in generated and "class PetQuery(" in generated
+    assert "class DatabaseQuery(" in generated
+    # Single-table classes accept every spelling; the joined class only the
+    # spellings that stay unambiguous.
+    assert 'selections: Literal["person.id", "id"]' in generated
+    assert 'selections: Literal["person.id"],' in generated
+    assert "PersonScope: TypeAlias = Literal[" in generated
+    assert 'Cons[Literal["id"], int, FieldsT]' in generated
+    assert 'Cons[Literal["nickname"], Optional[str], FieldsT]' in generated
+    assert 'Cons[Literal["nickname"], str | None, FieldsT]' in generated
 
 
 def test_generates_value_types_per_operator_family() -> None:
@@ -236,7 +219,7 @@ def test_generated_module_is_self_contained(tmp_path: Path) -> None:
 
     module_path = tmp_path / "schema.py"
     module_path.write_text(generated)
-    from pysely import Database, Dialect, Pysely, Row
+    from pysely import Database, Dialect, Pysely
     from pysely.query_compiler import BindingProfile
 
     sys.path.insert(0, str(tmp_path))
@@ -247,7 +230,7 @@ def test_generated_module_is_self_contained(tmp_path: Path) -> None:
         )
         assert type(db) is module.DatabaseClient
         assert isinstance(db, Pysely)
-        assert issubclass(module.DatabaseRow, Row)
+        assert module.PersonQuery is not module.DatabaseQuery
         query = db.select_from("pet").where("species", "=", "cat").select("pet.id")
         compiled = query.compile()
     finally:
@@ -268,7 +251,7 @@ def test_generated_module_imports_in_a_fresh_process_and_package(
     (package / "schema.py").write_text(generate(SCHEMA, output="app/schema.py"))
     script = textwrap.dedent(
         """
-        from app.schema import schema, DatabaseClient, DatabaseRow
+        from app.schema import schema, DatabaseClient, PersonQuery
         from pysely import Database, Dialect
         from pysely.query_compiler import BindingProfile
         from pysely.schema import Schema
@@ -367,3 +350,4 @@ def test_heavy_overloads_live_only_under_type_checking() -> None:
     assert "@overload" in typed
     assert "@overload" not in runtime
     assert "class DatabaseQuery(TypedSchemaQueryBuilder):" in runtime
+    assert "class PersonQuery(SingleTableQuery):" in runtime

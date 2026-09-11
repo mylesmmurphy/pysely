@@ -24,16 +24,18 @@ from .query_builder import (
     ExpressionBuilder,
     InsertQueryBuilder,
     InsertResult,
+    OrderDirection,
     ReferenceOperator,
     SchemaComparisonOperator,
     SelectQueryBuilder,
+    SetOperator,
     TypedSchemaQueryBuilder,
     UpdateQueryBuilder,
     UpdateResult,
 )
 from .query_compiler import BindingProfile, CompiledQuery
 from .query_executor import QueryPlugin
-from .row import Row
+from .row import Cons, Nil, Row
 from .schema import GeneratedSchema
 
 __all__ = [
@@ -42,6 +44,7 @@ __all__ = [
     "ClosedClientError",
     "Column",
     "CompiledQuery",
+    "Cons",
     "Database",
     "DeleteQueryBuilder",
     "DeleteResult",
@@ -55,7 +58,9 @@ __all__ = [
     "MssqlDialect",
     "MysqlDialect",
     "MysqlDriver",
+    "Nil",
     "NoResultError",
+    "OrderDirection",
     "PGliteDialect",
     "PostgresDialect",
     "PostgresDriver",
@@ -66,6 +71,7 @@ __all__ = [
     "Row",
     "SchemaComparisonOperator",
     "SelectQueryBuilder",
+    "SetOperator",
     "SqliteDialect",
     "Table",
     "TypedSchemaQueryBuilder",
