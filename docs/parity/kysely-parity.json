@@ -8,9 +8,9 @@
     "dialect_support": {"postgres": true, "mysql": true, "sqlite": true},
     "runtime_status": "verified",
     "mypy_status": "verified",
-    "portable_typing_status": "implemented_unverified",
-    "tests": ["test/runtime/test_schema_queries.py", "test/typings/test_schema_plugin.py", "test/typings/test_portable_schema.py"],
-    "difference": "A generated-client fixture verifies standard Pyright table and inner-join scope completion. Production code generation and exact portable projection results remain incomplete."
+    "portable_typing_status": "verified",
+    "tests": ["test/runtime/test_schema_queries.py", "test/typings/test_typed_schema.py", "test/typings/typed_queries.py", "test/typings/typed_errors.py.txt"],
+    "difference": "Scope, per-key row types and completions are verified against a freshly generated module under stock mypy and Pyright. List projections read keys as object; bare names shared across the database must be qualified once a second table is joined."
   },
   {
     "id": "select.explicit_projection.where",
@@ -82,8 +82,7 @@
     "tests": [
       "test/compiler/test_write.py",
       "test/runtime/test_sqlite_writes.py",
-      "test/typings/portable.py",
-      "test/typings/test_schema_plugin.py"
+      "test/typings/portable.py"
     ],
     "difference": null
   },
@@ -206,5 +205,31 @@
       "test/operation_node/test_transformer.py"
     ],
     "difference": "Reference comparisons currently cover equality and ordering operators."
+  },
+  {
+    "id": "select.outer_joins.nullability",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-builder/select-query-builder.ts",
+    "upstream_tests": ["test/node/src/join.test.ts"],
+    "pysely_api": "SchemaQueryBuilder.left_join/right_join/full_join",
+    "dialect_support": {"postgres": true, "mysql": "left and right only", "sqlite": true},
+    "runtime_status": "verified",
+    "mypy_status": "verified",
+    "portable_typing_status": "verified",
+    "tests": ["test/runtime/test_schema_queries.py", "test/typings/typed_queries.py", "test/typings/test_typed_schema.py"],
+    "difference": "Left joins make the joined table's direct columns nullable. Right and full joins make every key nullable, including the newly joined table's non-null columns (conservative). MySQL rejects full joins at compile time."
+  },
+  {
+    "id": "where.operator_families",
+    "upstream_commit": "c54987f4d5bb1a9573c8d83e1cba7365770cc016",
+    "upstream_source": "src/query-builder/where-interface.ts",
+    "upstream_tests": ["test/node/src/where.test.ts"],
+    "pysely_api": "SchemaQueryBuilder.where / ExpressionBuilder",
+    "dialect_support": {"postgres": true, "mysql": true, "sqlite": true},
+    "runtime_status": "verified",
+    "mypy_status": "verified",
+    "portable_typing_status": "verified",
+    "tests": ["test/runtime/test_schema_queries.py", "test/typings/typed_queries.py", "test/typings/typed_errors.py.txt"],
+    "difference": "Comparisons bind the non-null column type; is/is not take None; like takes str on string columns; in/not in take a list or tuple. Kysely accepts null in comparisons; Pysely rejects it at build time."
   }
 ]

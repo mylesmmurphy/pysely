@@ -9,6 +9,7 @@ from .nodes import (
     InsertQueryNode,
     IsNullNode,
     JoinNode,
+    NotNode,
     OperationNode,
     OrNode,
     ReferenceNode,
@@ -16,6 +17,7 @@ from .nodes import (
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
+    ValueListNode,
     ValueNode,
 )
 
@@ -45,6 +47,9 @@ class OperationNodeVisitor:
     def visit_ValueNode(self, node: ValueNode) -> None:
         pass
 
+    def visit_ValueListNode(self, node: ValueListNode) -> None:
+        pass
+
     def visit_AliasNode(self, node: AliasNode) -> None:
         self.visit(node.node)
         self.visit(node.alias)
@@ -63,6 +68,9 @@ class OperationNodeVisitor:
     def visit_OrNode(self, node: OrNode) -> None:
         for expression in node.expressions:
             self.visit(expression)
+
+    def visit_NotNode(self, node: NotNode) -> None:
+        self.visit(node.expression)
 
     def visit_SelectAllNode(self, node: SelectAllNode) -> None:
         for part in node.table:

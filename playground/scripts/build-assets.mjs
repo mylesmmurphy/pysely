@@ -50,7 +50,7 @@ writeFileSync(join(output, "typeshed-fallback.zip"), typeshedArchive);
 
 const userFiles = {
   ...textFiles(join(root, "src/pysely"), "site-packages/pysely"),
-  "workspace/database.py": readFileSync(join(root, "docs/assets/examples/database.py"), "utf8"),
+  "workspace/schema.py": readFileSync(join(root, "docs/assets/examples/schema.py"), "utf8"),
   "workspace/playground/__init__.pyi": readFileSync(join(root, "playground/__init__.pyi"), "utf8"),
 };
 const manifest = {
@@ -59,7 +59,7 @@ const manifest = {
   pythonVersion: "3.11",
   pyodidePythonVersion: "3.14",
   sourceRevision: "71b0cbe75fb8c38b3278ef7c8db16d2f4492f592",
-  schemaSha256: createHash("sha256").update(readFileSync(join(root, "docs/assets/examples/schema.py"))).digest("hex"),
+  tablesSha256: createHash("sha256").update(readFileSync(join(root, "docs/assets/examples/tables.py"))).digest("hex"),
   typeshed: {
     bytes: typeshedArchive.byteLength,
     sha256: createHash("sha256").update(typeshedArchive).digest("hex"),

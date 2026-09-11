@@ -3,10 +3,10 @@ import { expect, test } from "@playwright/test";
 const prefix = `from typing import cast
 from pysely import Database
 from pysely.dialect import Dialect
-from database import DatabaseSchema
+from schema import schema
 
 dialect = cast(Dialect, globals()["dialect"])
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 `;
 
 async function replaceQuery(page: import("@playwright/test").Page, code: string) {
@@ -127,18 +127,19 @@ test("keeps real execution available", async ({ page }) => {
   expect(gap).toBeLessThanOrEqual(20);
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
   await expect(page.locator("#playground-sql")).toContainText(
-    'select "first_name", "last_name", "pet"."name" as "pet_name"',
+    'select "person"."id", "first_name", "pet"."name" as "pet_name"',
   );
+  await expect(page.locator("#playground-sql")).toContainText("left join");
   await expect(page.locator(".pysely-playground__parameters")).toContainText(
-    '["dog","active"]',
+    '["active","dog"]',
   );
   const query = await page.evaluate(() => {
     const monaco = (window as any).monaco;
     return monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).getValue();
   });
-  expect(query).toContain("rows = await query.execute()");
-  expect(query).toContain('rows[0]["pet_name"]');
-  expect(query).toContain('rows[0]["last_name"]');
+  expect(query).toContain("row = await query.execute_take_first_or_throw()");
+  expect(query).toContain('row["pet_name"]');
+  expect(query).toContain('row["missing"]');
 });
 
 test("labels playground navigation as an interactive editor", async ({ page }) => {
@@ -241,26 +242,26 @@ test("uses readable tab URLs", async ({ page }) => {
   await expect(page.locator('input[id^="__tabbed_"]')).toHaveCount(0);
 });
 
-test("regenerates the typed interface from the schema editor", async ({ page }) => {
+test("regenerates the typed schema from the tables editor", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
 
-  // A column added in the schema editor must become usable in the query editor
+  // A column added in the tables editor must become usable in the query editor
   // without a rebuild: the playground runs `pysely codegen` on every run.
   await page.evaluate(() => {
     const monaco = (window as any).monaco;
-    const schema = monaco.editor.getModel(monaco.Uri.parse("file:///workspace/schema.py"));
-    schema.setValue(schema.getValue().replace("    last_name: str | None\n", "    last_name: str | None\n    nickname: str | None\n"));
+    const tables = monaco.editor.getModel(monaco.Uri.parse("file:///workspace/tables.py"));
+    tables.setValue(tables.getValue().replace("    last_name: str | None\n", "    last_name: str | None\n    nickname: str | None\n"));
   });
   await page.evaluate(code => {
     const monaco = (window as any).monaco;
     monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
-  }, `from database import DatabaseSchema
+  }, `from schema import schema
 from playground import dialect
 from pysely import Database
 
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 compiled = db.select_from("person").select("nickname").compile()
 `);
 

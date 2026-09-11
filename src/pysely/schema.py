@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin, get_type_hints
 
@@ -13,8 +14,14 @@ from pysely.operation_node import (
     OperationNode,
     ReferenceNode,
     TableNode,
+    ValueListNode,
     ValueNode,
 )
+
+COMPARISON_OPERATORS = frozenset({"=", "!=", "<>", "<", "<=", ">", ">="})
+NULL_OPERATORS = frozenset({"is", "is not"})
+PATTERN_OPERATORS = frozenset({"like", "not like"})
+COLLECTION_OPERATORS = frozenset({"in", "not in"})
 
 ClientT = TypeVar("ClientT")
 
@@ -106,24 +113,31 @@ class Schema:
     def predicate(
         self, scope: dict[str, str], column: str, operator: str, value: object
     ) -> OperationNode:
-        if operator not in {
-            "=",
-            "!=",
-            "<>",
-            "<",
-            "<=",
-            ">",
-            ">=",
-            "is",
-            "is not",
-            "like",
-            "not like",
-        }:
-            raise InvalidQueryError(f"Unsupported comparison operator: {operator}")
+        """Build ``column <operator> value``.
+
+        Each operator family takes a different value shape, and the runtime
+        enforces the same rules the generated overloads express: comparisons
+        and patterns bind one non-null value, ``is``/``is not`` take ``None``,
+        and ``in``/``not in`` take a non-string sequence.
+        """
         reference = self.reference(scope, column)
-        if value is None and operator in {"is", "is not"}:
+        if operator in NULL_OPERATORS:
+            if value is not None:
+                raise InvalidQueryError(f"{operator!r} compares against None only")
             return IsNullNode(reference, negated=operator == "is not")
-        return BinaryOperationNode(reference, operator, ValueNode(value))
+        if operator in COLLECTION_OPERATORS:
+            if isinstance(value, str | bytes) or not isinstance(
+                value, Sequence | AbstractSet
+            ):
+                raise InvalidQueryError(f"{operator!r} requires a list or tuple")
+            return BinaryOperationNode(reference, operator, ValueListNode(tuple(value)))
+        if operator in COMPARISON_OPERATORS or operator in PATTERN_OPERATORS:
+            if value is None:
+                raise InvalidQueryError(
+                    f"{operator!r} cannot compare against None; use 'is' or 'is not'"
+                )
+            return BinaryOperationNode(reference, operator, ValueNode(value))
+        raise InvalidQueryError(f"Unsupported comparison operator: {operator}")
 
     def validate_values(self, table: str, values: Mapping[str, object]) -> None:
         unknown = values.keys() - self.tables[table].keys()

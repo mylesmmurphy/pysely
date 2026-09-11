@@ -24,14 +24,14 @@ compiled = query.compile()
 Write your tables as annotated classes, generate one module, import it:
 
 ```bash
-pysely codegen schema.py --output db.py
+pysely codegen tables.py --output schema.py
 ```
 
 ```python
-from db import DatabaseSchema
+from schema import schema
 from pysely import Database
 
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 ```
 
 mypy and Pyright now know every table, column, and value type. No checker

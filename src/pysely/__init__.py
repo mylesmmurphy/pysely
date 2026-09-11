@@ -24,6 +24,7 @@ from .query_builder import (
     ExpressionBuilder,
     InsertQueryBuilder,
     InsertResult,
+    ReferenceOperator,
     SchemaComparisonOperator,
     SelectQueryBuilder,
     TypedSchemaQueryBuilder,
@@ -32,6 +33,7 @@ from .query_builder import (
 )
 from .query_compiler import BindingProfile, CompiledQuery
 from .query_executor import QueryPlugin
+from .row import Row
 from .schema import GeneratedSchema
 
 __all__ = [
@@ -60,6 +62,8 @@ __all__ = [
     "Pysely",
     "PyselyError",
     "QueryPlugin",
+    "ReferenceOperator",
+    "Row",
     "SchemaComparisonOperator",
     "SelectQueryBuilder",
     "SqliteDialect",

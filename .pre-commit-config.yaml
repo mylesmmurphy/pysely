@@ -5,8 +5,8 @@ repos:
         name: pysely codegen
         description: Regenerate the playground's typed interface from its schema.
         entry: >-
-          uv run pysely codegen docs/assets/examples/schema.py
-          --output docs/assets/examples/database.py
+          uv run pysely codegen docs/assets/examples/tables.py
+          --output docs/assets/examples/schema.py
         language: system
         pass_filenames: false
         files: ^docs/assets/examples/(schema|database)\.py$

@@ -19,8 +19,8 @@ rows = await (
 )
 ```
 
-Types come from one generated module — `pysely codegen schema.py --output
-db.py` — checked by mypy and Pyright with no plugin. See
+Types come from one generated module — `pysely codegen tables.py --output
+schema.py` — checked by mypy and Pyright with no plugin. See
 [Code generation](codegen.md).
 
 ## Current database support

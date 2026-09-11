@@ -4,8 +4,8 @@ Two layers, one source of truth:
 
 | Layer | Source | What it does |
 | --- | --- | --- |
-| Runtime | your schema classes | validates table and column names when a query is built |
-| Static | `db.py`, generated from those classes | lets mypy and Pyright check queries and complete names |
+| Runtime | your table classes | validates table and column names when a query is built |
+| Static | `schema.py`, generated from those classes | lets mypy and Pyright check queries and complete names |
 
 No checker plugin. Both checkers read ordinary annotations.
 
@@ -34,47 +34,87 @@ checked statically; rows are `dict[str, object]`.
 Run [code generation](codegen.md) and import the result:
 
 ```bash
-pysely codegen schema.py --output db.py
+pysely codegen tables.py --output schema.py
 ```
 
 ```python
-from db import DatabaseSchema
+from schema import schema
 from pysely import Database
 
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 ```
+
+Each line below is covered by a test that runs stock mypy 1.20 and Pyright
+1.1.413 against a freshly generated module (`test/typings`).
 
 | Capability | Status |
 | --- | --- |
-| Table and column completion, before and after inner joins | Yes |
-| Unknown or unjoined columns | Error |
-| `.where()` values checked against the column type | Yes |
-| Result keys from chained `.select()` / `.select_as()` | Literal keys |
-| Result keys from `.select([...])` lists | `dict[str, object]` |
+| Table and column completion, in scope only | Verified |
+| Unknown, unjoined or ambiguous columns in `select`, `select_as`, `where`, `where_ref`, joins and callbacks | Error |
+| `where` values checked per operator family (see below) | Verified |
+| Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | Verified |
+| `select_as` alias typed as a key | Verified for a literal alias |
+| Left join: the joined table's keys become `X \| None` | Verified |
+| Right and full join: every key becomes `X \| None` | Verified (conservative) |
+| `.select([...])` lists | Scope-checked; keys read as `object` |
 | Typed string writes | Not yet |
-| Outer-join nullability | Not yet |
+| Table aliases (`"person as p"`) | Runtime only |
 | PyCharm | Not verified |
 
-## Rules
+## Names
 
-- Chain one `.select()` per column to keep result keys typed.
-- Qualify column names that exist on more than one table (`person.id`).
+- A bare name works when only one table in the database declares it, or when
+  it is the only table in the query (`db.select_from("person").select("id")`).
+- After a join, a name two tables declare must be qualified: `person.id`.
+  The static rule is stricter than the runtime one in one case: a joined
+  query with a bare name that is unique in the *query* but not in the
+  database must still qualify it.
 - `.select_as("pet.name", "pet_name")` keeps the alias typed; the string form
-  `"pet.name as pet_name"` compiles but is untyped.
-- Rows are dicts: `row["first_name"]`, not `row.first_name`.
+  `"pet.name as pet_name"` is runtime only.
 
-## Diagnostics
+## Operator families
 
-A wrong argument gets an argument-sized error. The failing call also gets a
-call-sized error, because the fluent chain is the call's receiver.
+| Operators | Value |
+| --- | --- |
+| `=` `!=` `<>` `<` `<=` `>` `>=` | the column's type, without `None` |
+| `is` `is not` | `None` |
+| `like` `not like` | `str`, string columns only |
+| `in` `not in` | `list` or `tuple` of the column's type |
 
-Pyright's `strict` mode adds "type of X is unknown" errors across the rest of
-the chain after one failure. The playground uses `standard`, Pyright's default,
-which does not. Pick `standard` in Pylance to match.
+The same rules apply inside `where(lambda eb: ...)`; `eb.and_`, `eb.or_`,
+`eb.not_` and `eb.ref` compose them.
 
-Value completion after a join is a superset: an editor may offer literals from
-any joined table at the `where()` value position. Wrong values are still
-errors.
+## Rows
+
+Typed queries return `DatabaseRow` instances: immutable mappings with
+per-key value types. `dict(row)` and `**row` do not type-check because the
+row rejects unknown keys statically; use `row.to_dict()`. Selecting the same
+output name twice is a runtime error (`select_as` to disambiguate).
+
+## Known boundaries
+
+Each has a reproducer in `test/typings`.
+
+- **Whole-chain diagnostic.** Every typed method is an overload set, and both
+  checkers report "No overloads match" on the full call expression. Pyright
+  adds the argument-level error beside it. Pyright's `strict` mode also
+  cascades "type of X is unknown" errors down the chain; the playground uses
+  `standard`, which does not. Pick `standard` in Pylance to match.
+- **Value suggestions after a join are a superset.** Pyright unions the value
+  literals of every overload whose receiver matches, so an editor may offer
+  `pet` enum values at a `person` column. Wrong values are still errors.
+- **Non-literal aliases.** Under Pyright a `str` alias makes the row's keys
+  read as `object`. mypy has no `LiteralString`, so it treats a `str` alias as
+  a literal and types every key as that column. A union alias
+  (`Literal["a", "b"]`) types both keys under both checkers although only one
+  exists.
+- **List projections** keep scope checks but cannot capture keys: mypy infers
+  `list[str]` for a list literal.
+- **Dynamic table names** (`select_from(table)` with `table: str`) are a
+  static error; use the untyped `Pysely` client for those.
+- **Helpers** must name the scope they need
+  (`DatabaseQuery[PersonColumns, NullT, RowT]`); `ColumnT | PersonColumns`
+  parameters are solved inconsistently by the two checkers.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

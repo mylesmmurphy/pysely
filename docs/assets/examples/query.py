@@ -1,18 +1,18 @@
-from database import DatabaseSchema
+from schema import schema
 
 from playground import dialect
 from pysely import Database
 
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 
-# Try it: misspell a column, or change "dog" to "bird".
+# Try it: misspell a column, change "dog" to "bird", or select "id".
 query = (
     db.select_from("person")
-    .inner_join("pet", "owner_id", "person.id")
-    .where("species", "=", "dog")
+    .left_join("pet", "owner_id", "person.id")
     .where("status", "=", "active")
+    .where(lambda eb: eb.or_(eb("species", "=", "dog"), eb("species", "is", None)))
+    .select("person.id")
     .select("first_name")
-    .select("last_name")
     .select_as("pet.name", "pet_name")
 )
 
@@ -20,6 +20,8 @@ compiled = query.compile()
 
 
 async def run_query() -> None:
-    rows = await query.execute()
-    rows[0]["pet_name"]  # hover: str
-    rows[0]["last_name"]  # hover: str | None
+    row = await query.execute_take_first_or_throw()
+    row["id"]  # hover: int
+    row["first_name"]  # hover: str
+    row["pet_name"]  # hover: str | None (left join)
+    row["missing"]  # error: not selected

@@ -13,6 +13,7 @@ from .nodes import (
     InsertQueryNode,
     IsNullNode,
     JoinNode,
+    NotNode,
     OperationNode,
     OrNode,
     ReferenceNode,
@@ -20,6 +21,7 @@ from .nodes import (
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
+    ValueListNode,
     ValueNode,
 )
 
@@ -55,6 +57,9 @@ class OperationNodeTransformer:
     def transform_ValueNode(self, node: ValueNode) -> OperationNode:
         return node
 
+    def transform_ValueListNode(self, node: ValueListNode) -> OperationNode:
+        return node
+
     def transform_AliasNode(self, node: AliasNode) -> OperationNode:
         return replace(
             node,
@@ -83,6 +88,9 @@ class OperationNodeTransformer:
             node,
             expressions=tuple(self.transform(item) for item in node.expressions),
         )
+
+    def transform_NotNode(self, node: NotNode) -> OperationNode:
+        return replace(node, expression=self.transform(node.expression))
 
     def transform_SelectAllNode(self, node: SelectAllNode) -> OperationNode:
         return replace(

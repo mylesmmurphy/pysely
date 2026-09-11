@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -10,22 +11,26 @@ import pytest
 from pysely.codegen import SchemaError, generate, parse_schema
 
 ROOT = Path(__file__).parents[2]
-EXAMPLE_SCHEMA = ROOT / "docs/assets/examples/schema.py"
-EXAMPLE_DATABASE = ROOT / "docs/assets/examples/database.py"
+GENERATED = {
+    ROOT / "test/fixtures/schema.py": ROOT / "test/fixtures/tables.py",
+    ROOT / "docs/assets/examples/schema.py": ROOT / "docs/assets/examples/tables.py",
+}
 
 SCHEMA = """
-from typing import Literal
+from typing import Literal, Optional
 
 
 class PersonTable:
     id: int
     name: str
+    nickname: Optional[str]
     status: Literal["active", "inactive"]
 
 
 class PetTable:
     id: int
     species: Literal["cat", "dog"]
+    weight: float | None
 
 
 class DatabaseSchema:
@@ -41,27 +46,87 @@ def test_parses_tables_and_columns() -> None:
     assert [column.name for column in model.tables[0].columns] == [
         "id",
         "name",
+        "nickname",
         "status",
     ]
 
 
-def test_bare_names_are_omitted_when_ambiguous() -> None:
+def test_splits_nullable_annotations_in_every_spelling() -> None:
+    person, pet = parse_schema(SCHEMA).tables
+    nickname = person.columns[2]
+    assert (nickname.annotation, nickname.value, nickname.nullable) == (
+        "Optional[str]",
+        "str",
+        True,
+    )
+    weight = pet.columns[2]
+    assert (weight.value, weight.nullable) == ("float", True)
+    union = parse_schema(SCHEMA.replace("Optional[str]", "Union[None, str]")).tables[0]
+    assert (union.columns[2].value, union.columns[2].nullable) == ("str", True)
+
+
+def test_shared_bare_names_are_scope_specific() -> None:
     model = parse_schema(SCHEMA)
     person, pet = model.tables
-    # "id" exists on both tables, so only the qualified form is offered.
+    # "id" exists on both tables: only the qualified form works in any scope.
+    assert model.shared("id")
     assert model.references(person, "id") == ["person.id"]
     assert model.references(pet, "id") == ["pet.id"]
     assert model.references(person, "name") == ["person.name", "name"]
-
-
-def test_generates_literal_aliases_and_value_types() -> None:
     generated = generate(SCHEMA)
-    assert "PersonColumns: TypeAlias = Literal[" in generated
-    assert '    "person.status",' in generated
-    assert '    "status",' in generated
-    # The column's value type reaches the where() overload.
+    # ...but a single-table query still accepts the bare name.
+    assert (
+        "self: DatabaseQuery[\n                PersonColumns,\n                Never,"
+        in generated
+    )
+    assert 'selections: Literal["id"],' in generated
+
+
+def test_one_key_group_per_value_type_plus_nullable_forms() -> None:
+    model = parse_schema(SCHEMA)
+    assert [(group.name, group.value) for group in model.groups] == [
+        ("IntKeys", "int"),
+        ("OptIntKeys", "int | None"),
+        ("StrKeys", "str"),
+        ("OptStrKeys", "str | None"),
+        ("StatusKeys", 'Literal["active", "inactive"]'),
+        ("OptStatusKeys", 'Literal["active", "inactive"] | None'),
+        ("SpeciesKeys", 'Literal["cat", "dog"]'),
+        ("OptSpeciesKeys", 'Literal["cat", "dog"] | None'),
+        ("FloatKeys", "float"),
+        ("OptFloatKeys", "float | None"),
+        ("ObjectKeys", "object"),
+    ]
+
+
+def test_group_names_do_not_collide() -> None:
+    source = SCHEMA.replace(
+        'status: Literal["active", "inactive"]', "status: int\n    kind: Literal['a']"
+    ).replace('species: Literal["cat", "dog"]', "kind: Literal['b']")
+    names = [group.name for group in parse_schema(source).groups]
+    assert "KindKeys" in names
+    assert "Kind2Keys" in names
+    assert len(names) == len(set(names))
+
+
+def test_generates_value_types_per_operator_family() -> None:
+    generated = generate(SCHEMA)
     assert 'value: Literal["active", "inactive"],' in generated
-    assert 'value: Literal["cat", "dog"],' in generated
+    assert 'operator: Literal["in", "not in"],' in generated
+    assert (
+        'value: list[Literal["cat", "dog"]] | tuple[Literal["cat", "dog"], ...]'
+        in generated
+    )
+    assert 'operator: Literal["is", "is not"],' in generated
+    assert "value: None," in generated
+    like = 'operator: Literal["like", "not like"],'
+    assert like in generated
+    # LIKE is offered for string-like columns only.
+    assert f'column: Literal["pet.weight", "weight"],\n            {like}' not in (
+        generated
+    )
+    names = 'column: Literal["person.name", "name", "person.nickname", "nickname"],'
+    assert f"{names}\n            {like}" in generated
 
 
 def test_generation_is_deterministic() -> None:
@@ -79,114 +144,80 @@ def test_rejects_a_table_without_columns() -> None:
         generate(source)
 
 
-def test_generated_example_is_committed_and_current() -> None:
-    """The checked-in interface must match what the generator produces."""
+@pytest.mark.parametrize(("output", "source"), GENERATED.items())
+def test_generated_modules_are_committed_and_current(
+    output: Path, source: Path
+) -> None:
+    """The checked-in modules must match what the generator produces."""
+    relative_source = source.relative_to(ROOT)
+    relative_output = output.relative_to(ROOT)
     expected = generate(
-        EXAMPLE_SCHEMA.read_text(),
-        source_name="docs/assets/examples/schema.py",
-        output="docs/assets/examples/database.py",
+        source.read_text(),
+        source_name=str(relative_source),
+        output=str(relative_output),
     )
-    assert EXAMPLE_DATABASE.read_text() == expected, (
-        "docs/assets/examples/database.py is out of date; run "
-        "`pysely codegen docs/assets/examples/schema.py "
-        "--output docs/assets/examples/database.py`"
+    assert output.read_text() == expected, (
+        f"{relative_output} is out of date; run "
+        f"`pysely codegen {relative_source} --output {relative_output}`"
     )
 
 
-def test_generated_output_passes_lint_and_format() -> None:
-    ruff = subprocess.run(
-        [sys.executable, "-m", "ruff", "check", str(EXAMPLE_DATABASE)],
-        capture_output=True,
-        text=True,
-    )
-    assert ruff.returncode == 0, ruff.stdout + ruff.stderr
-    formatted = subprocess.run(
-        [sys.executable, "-m", "ruff", "format", "--check", str(EXAMPLE_DATABASE)],
-        capture_output=True,
-        text=True,
-    )
-    assert formatted.returncode == 0, formatted.stdout + formatted.stderr
+@pytest.mark.parametrize("output", GENERATED)
+def test_generated_output_passes_lint_and_format(output: Path) -> None:
+    for command in (["check"], ["format", "--check"]):
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", *command, str(output)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_cli_writes_and_detects_drift(tmp_path: Path) -> None:
-    schema = tmp_path / "schema.py"
-    schema.write_text(SCHEMA)
-    output = tmp_path / "generated" / "db.py"
+    tables = tmp_path / "tables.py"
+    tables.write_text(SCHEMA)
+    output = tmp_path / "generated" / "schema.py"
+    cli = [
+        sys.executable,
+        "-m",
+        "pysely.cli",
+        "codegen",
+        str(tables),
+        "-o",
+        str(output),
+    ]
 
-    missing = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pysely.cli",
-            "codegen",
-            str(schema),
-            "-o",
-            str(output),
-            "--check",
-        ],
-        capture_output=True,
-        text=True,
-    )
+    missing = subprocess.run([*cli, "--check"], capture_output=True, text=True)
     assert missing.returncode == 1
     assert "does not exist" in missing.stderr
 
-    written = subprocess.run(
-        [sys.executable, "-m", "pysely.cli", "codegen", str(schema), "-o", str(output)],
-        capture_output=True,
-        text=True,
+    written = subprocess.run(cli, capture_output=True, text=True)
+    assert written.returncode == 0
+    assert output.read_text() == generate(
+        SCHEMA, source_name=str(tables), output=str(output)
     )
-    assert written.returncode == 0, written.stderr
-    assert output.exists()
 
-    current = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pysely.cli",
-            "codegen",
-            str(schema),
-            "-o",
-            str(output),
-            "--check",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    assert current.returncode == 0, current.stderr
+    current = subprocess.run([*cli, "--check"], capture_output=True, text=True)
+    assert current.returncode == 0
 
-    schema.write_text(
-        SCHEMA.replace("    name: str\n", "    name: str\n    note: str\n")
-    )
-    stale = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pysely.cli",
-            "codegen",
-            str(schema),
-            "-o",
-            str(output),
-            "--check",
-        ],
-        capture_output=True,
-        text=True,
-    )
+    tables.write_text(SCHEMA.replace("    id: int\n    name: str", "    id: int"))
+    stale = subprocess.run([*cli, "--check"], capture_output=True, text=True)
     assert stale.returncode == 1
     assert "out of date" in stale.stderr
 
 
 def test_cli_reports_a_bad_schema(tmp_path: Path) -> None:
-    schema = tmp_path / "schema.py"
-    schema.write_text("class Lonely:\n    id: int\n")
+    tables = tmp_path / "tables.py"
+    tables.write_text("class Lonely:\n    id: int\n")
     result = subprocess.run(
         [
             sys.executable,
             "-m",
             "pysely.cli",
             "codegen",
-            str(schema),
+            str(tables),
             "-o",
-            str(tmp_path / "db.py"),
+            str(tmp_path / "s.py"),
         ],
         capture_output=True,
         text=True,
@@ -196,34 +227,96 @@ def test_cli_reports_a_bad_schema(tmp_path: Path) -> None:
 
 
 def test_generated_module_is_self_contained(tmp_path: Path) -> None:
-    """The output imports nothing from the schema module and runs on its own."""
+    """The output imports nothing from the table module and runs on its own."""
     generated = generate(SCHEMA)
-    assert "from schema import" not in generated
+    assert "from tables import" not in generated
     assert "class PersonTable:" in generated
     assert "class DatabaseSchema(GeneratedSchema[DatabaseClient]):" in generated
+    assert "schema = DatabaseSchema" in generated
 
-    module_path = tmp_path / "db.py"
+    module_path = tmp_path / "schema.py"
     module_path.write_text(generated)
-    from pysely import Database, Dialect, Pysely
+    from pysely import Database, Dialect, Pysely, Row
     from pysely.query_compiler import BindingProfile
 
     sys.path.insert(0, str(tmp_path))
     try:
-        module = importlib.import_module("db")
+        module = importlib.import_module("schema")
         db = Database(
-            schema=module.DatabaseSchema, dialect=Dialect(BindingProfile("test", "?"))
+            schema=module.schema, dialect=Dialect(BindingProfile("test", "?"))
         )
-        # The schema names its client, and create() returns that client.
         assert type(db) is module.DatabaseClient
         assert isinstance(db, Pysely)
+        assert issubclass(module.DatabaseRow, Row)
         query = db.select_from("pet").where("species", "=", "cat").select("pet.id")
         compiled = query.compile()
     finally:
         sys.path.remove(str(tmp_path))
-        sys.modules.pop("db", None)
+        sys.modules.pop("schema", None)
 
     assert compiled.sql == 'select "pet"."id" from "pet" where "species" = ?'
     assert compiled.parameters == ("cat",)
+
+
+def test_generated_module_imports_in_a_fresh_process_and_package(
+    tmp_path: Path,
+) -> None:
+    """Postponed annotations and TYPE_CHECKING twins survive a real import."""
+    package = tmp_path / "app"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "schema.py").write_text(generate(SCHEMA, output="app/schema.py"))
+    script = textwrap.dedent(
+        """
+        from app.schema import schema, DatabaseClient, DatabaseRow
+        from pysely import Database, Dialect
+        from pysely.query_compiler import BindingProfile
+        from pysely.schema import Schema
+
+        db = Database(schema=schema, dialect=Dialect(BindingProfile("test", "?")))
+        assert type(db) is DatabaseClient
+        assert Schema.from_type(schema).tables["person"]["nickname"] == str | None
+        print(db.select_from("person").select("name").compile().sql)
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        env={"PYTHONPATH": str(ROOT / "src")},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == 'select "name" from "person"'
+
+
+def test_two_generated_schemas_coexist(tmp_path: Path) -> None:
+    other = SCHEMA.replace("PersonTable", "UserTable").replace("person:", "user:")
+    (tmp_path / "one.py").write_text(generate(SCHEMA, output="one.py"))
+    (tmp_path / "two.py").write_text(generate(other, output="two.py"))
+    script = textwrap.dedent(
+        """
+        import one, two
+        from pysely import Database, Dialect
+        from pysely.query_compiler import BindingProfile
+
+        dialect = Dialect(BindingProfile("test", "?"))
+        a = Database(schema=one.schema, dialect=dialect)
+        b = Database(schema=two.schema, dialect=dialect)
+        assert type(a) is one.DatabaseClient and type(b) is two.DatabaseClient
+        assert one.DatabaseClient is not two.DatabaseClient
+        print(b.select_from("user").select("name").compile().sql)
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        env={"PYTHONPATH": str(ROOT / "src")},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == 'select "name" from "user"'
 
 
 class PlainPersonTable:
@@ -247,7 +340,8 @@ def test_database_falls_back_to_plain_client_for_ungenerated_schema() -> None:
 
 def test_generated_module_merges_schema_typing_imports() -> None:
     source = SCHEMA.replace(
-        "from typing import Literal", "from typing import Literal, TypedDict"
+        "from typing import Literal, Optional",
+        "from typing import Literal, Optional, TypedDict",
     )
     generated = generate(source)
     assert "    TypedDict," in generated
@@ -263,3 +357,13 @@ def test_rejects_schema_class_names_the_output_defines() -> None:
 def test_schema_may_be_named_database() -> None:
     generated = generate(SCHEMA.replace("class DatabaseSchema:", "class Database:"))
     assert "class Database(GeneratedSchema[DatabaseClient]):" in generated
+    assert "schema = Database" in generated
+
+
+def test_heavy_overloads_live_only_under_type_checking() -> None:
+    generated = generate(SCHEMA)
+    typed, runtime = generated.split("\nelse:\n", 1)
+    assert "if TYPE_CHECKING:" in typed
+    assert "@overload" in typed
+    assert "@overload" not in runtime
+    assert "class DatabaseQuery(TypedSchemaQueryBuilder):" in runtime

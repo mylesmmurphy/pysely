@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Literal, TypeAlias
+
+JoinKind: TypeAlias = Literal["inner", "left", "right", "full"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +27,13 @@ class ReferenceNode:
 @dataclass(frozen=True, slots=True)
 class ValueNode:
     value: object
+
+
+@dataclass(frozen=True, slots=True)
+class ValueListNode:
+    """A parenthesized list of bound values, as used by ``in``."""
+
+    values: tuple[object, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +66,11 @@ class OrNode:
 
 
 @dataclass(frozen=True, slots=True)
+class NotNode:
+    expression: OperationNode
+
+
+@dataclass(frozen=True, slots=True)
 class SelectAllNode:
     table: tuple[IdentifierNode, ...] = ()
 
@@ -65,6 +79,7 @@ class SelectAllNode:
 class JoinNode:
     table: TableNode
     on: BinaryOperationNode
+    kind: JoinKind = "inner"
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,11 +118,13 @@ OperationNode: TypeAlias = (
     | TableNode
     | ReferenceNode
     | ValueNode
+    | ValueListNode
     | AliasNode
     | BinaryOperationNode
     | IsNullNode
     | AndNode
     | OrNode
+    | NotNode
     | SelectAllNode
     | SelectQueryNode
     | JoinNode

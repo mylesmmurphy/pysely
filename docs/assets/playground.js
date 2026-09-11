@@ -111,12 +111,12 @@
       this.notify("textDocument/didClose", { textDocument: { uri: model.uri.toString() } });
     }
 
-    // database.py is written by `pysely codegen`, not by hand. The playground
-    // regenerates it from the schema editor on every run and pushes it here so
-    // Pyright checks the interface the schema actually produces.
+    // schema.py is written by `pysely codegen`, not by hand. The playground
+    // regenerates it from the tables editor on every run and pushes it here so
+    // Pyright checks the typed schema the tables actually produce.
     updateGenerated(text) {
       if (typeof text !== "string" || this.generated === text) return;
-      const uri = "file:///workspace/database.py";
+      const uri = "file:///workspace/schema.py";
       const version = (this.generatedVersion = (this.generatedVersion || 0) + 1);
       if (this.generated === undefined) {
         this.notify("textDocument/didOpen", { textDocument: { uri, languageId: "python", version, text } });
@@ -124,7 +124,7 @@
         this.notify("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
       }
       this.generated = text;
-      this.files["workspace/database.py"] = text;
+      this.files["workspace/schema.py"] = text;
     }
 
     textRequest(method, model, position, token, extra = {}) {
@@ -187,7 +187,7 @@
       const typeshed = await typeshedResponse.arrayBuffer();
       const files = {
         ...manifest.files,
-        "workspace/schema.py": models[0].getValue(),
+        "workspace/tables.py": models[0].getValue(),
         "workspace/query.py": models[1].getValue(),
       };
       worker = new Worker(assetUrl("intelligence/pyright-worker.js"));
@@ -212,7 +212,7 @@
       client.diagnostics = params => {
         const model = monaco.editor.getModel(monaco.Uri.parse(params.uri));
         if (!model) return;
-        const generatedUri = model.uri.path === "/workspace/database.py";
+        const generatedUri = model.uri.path === "/workspace/schema.py";
         if (!generatedUri && params.version && params.version < model.getVersionId()) return;
         monaco.editor.setModelMarkers(model, "pyright", params.diagnostics.map(item => ({
           ...lspRange(item.range), message: item.message, code: item.code,
@@ -350,7 +350,7 @@
     const error = root.querySelector("#playground-error");
     try {
       const [, schemaResponse, queryResponse] = await Promise.all([
-        loadEditor(), fetch(assetUrl("examples/schema.py")), fetch(assetUrl("examples/query.py")),
+        loadEditor(), fetch(assetUrl("examples/tables.py")), fetch(assetUrl("examples/query.py")),
       ]);
       if (!root.isConnected || version !== mountVersion) return;
       if (!schemaResponse.ok || !queryResponse.ok) throw new Error("Could not load the example files");
@@ -360,9 +360,9 @@
         scrollbar: { alwaysConsumeMouseWheel: false, vertical: "visible", horizontal: "visible", verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
         padding: { top: 12 }, tabSize: 4, wordWrap: "on", fixedOverflowWidgets: true,
         quickSuggestions: { other: true, comments: false, strings: true }, wordBasedSuggestions: "off" };
-      const schemaUri = monaco.Uri.parse("file:///workspace/schema.py");
+      const schemaUri = monaco.Uri.parse("file:///workspace/tables.py");
       const queryUri = monaco.Uri.parse("file:///workspace/query.py");
-      const generatedUri = monaco.Uri.parse("file:///workspace/database.py");
+      const generatedUri = monaco.Uri.parse("file:///workspace/schema.py");
       monaco.editor.getModel(schemaUri)?.dispose();
       monaco.editor.getModel(queryUri)?.dispose();
       monaco.editor.getModel(generatedUri)?.dispose();
@@ -380,7 +380,7 @@
       // The generated module. The model backs go-to-definition and diagnostics;
       // the viewer is static highlighted HTML, not a fourth editor, so it costs
       // nothing while scrolling.
-      const generatedModel = monaco.editor.createModel("# Run to generate database.py", "python", generatedUri);
+      const generatedModel = monaco.editor.createModel("# Run to generate schema.py", "python", generatedUri);
       const generatedView = root.querySelector("#playground-generated");
       const generatedCode = root.querySelector("#playground-generated-code");
       let renderedGenerated;
@@ -455,10 +455,15 @@
             runButton.disabled = false;
             stopButton.disabled = true;
             status.setAttribute("aria-busy", "false");
-            if (data.database && data.database !== generated) {
-              generated = data.database;
+            if (data.schema && data.schema !== generated) {
+              generated = data.schema;
               pushGenerated(generated);
               generatedModel.setValue(generated);
+              showGenerated();
+            } else if (!data.schema && data.error) {
+              // tables.py did not generate: Pyright keeps the last good module,
+              // and the view says so rather than passing it off as current.
+              generatedModel.setValue(`# Not regenerated: ${data.error.split("\n")[0]}\n${generated || ""}`);
               showGenerated();
             }
             if (data.error) {
@@ -484,7 +489,7 @@
             error.hidden = false;
           };
         }
-        worker.postMessage({ id: ++id, schema: models[0].getValue(), query: models[1].getValue(), dialect: dialect.value });
+        worker.postMessage({ id: ++id, tables: models[0].getValue(), query: models[1].getValue(), dialect: dialect.value });
       }
 
       function stop() {

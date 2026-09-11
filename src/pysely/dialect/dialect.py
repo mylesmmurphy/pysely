@@ -27,7 +27,9 @@ class PostgresDialect(Dialect):
 class MysqlDialect(Dialect):
     def __init__(self, *, pool: MysqlPoolProvider) -> None:
         driver = MysqlDriver(pool)
-        profile = BindingProfile("mysql-asyncmy", "%s", "`", "`", None)
+        profile = BindingProfile(
+            "mysql-asyncmy", "%s", "`", "`", None, supports_full_join=False
+        )
         super().__init__(profile, driver)
 
 

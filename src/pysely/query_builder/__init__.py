@@ -1,5 +1,6 @@
 from .schema_query_builder import (
     ExpressionBuilder,
+    ReferenceOperator,
     SchemaComparisonOperator,
     TypedSchemaQueryBuilder,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "ExpressionBuilder",
     "InsertQueryBuilder",
     "InsertResult",
+    "ReferenceOperator",
     "SchemaComparisonOperator",
     "SelectQueryBuilder",
     "TypedSchemaQueryBuilder",

@@ -1,17 +1,17 @@
 # Code generation
 
-One command turns your schema classes into one module. Pass its schema class
-to `Database`; nothing else is needed.
+One command turns your table classes into one typed schema module. Pass its
+`schema` to `Database`; nothing else is needed.
 
 ```
-schema.py  ──  pysely codegen  ──▶  db.py  ──  Database(schema=…)  ──▶  typed client
+tables.py  ──  pysely codegen  ──▶  schema.py  ──  Database(schema=…)  ──▶  typed client
 (you write)                          (generated)
 ```
 
-## 1. Write the schema
+## 1. Write the tables
 
 ```python
-# schema.py
+# tables.py
 from datetime import datetime
 from typing import Literal
 
@@ -19,6 +19,7 @@ from typing import Literal
 class PersonTable:
     id: int
     first_name: str
+    last_name: str | None
     status: Literal["active", "inactive"]
     created_at: datetime
 
@@ -35,68 +36,62 @@ class DatabaseSchema:
 ```
 
 - One class per table. The database class maps table names to those classes.
-- Don't name a class `DatabaseClient` or `DatabaseQuery`; the output defines
-  those.
+- `X | None`, `Optional[X]` and `Union[X, None]` all mean nullable.
+- Don't name a class `DatabaseClient`, `DatabaseQuery`, `DatabaseRow`,
+  `DatabaseExpressionBuilder` or `TableName`; the output defines those.
 
 ## 2. Generate
 
 ```bash
-pysely codegen schema.py --output db.py
+pysely codegen tables.py --output schema.py
 ```
 
-`db.py` contains a copy of your schema classes, with `DatabaseSchema` now
-carrying the typing, plus the client it builds. Commit it. `schema.py` is not
-needed at runtime.
+`schema.py` contains a copy of your table classes, the `schema` to pass to
+`Database`, and the typed query, row and expression classes. Commit it.
+`tables.py` is not needed at runtime.
 
 ## 3. Query
 
 ```python
-from db import DatabaseSchema
+from schema import schema
 from pysely import Database
 
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 
 query = (
     db.select_from("person")
-    .inner_join("pet", "owner_id", "person.id")
-    .where("species", "=", "hamster")
+    .left_join("pet", "owner_id", "person.id")
+    .where("status", "=", "active")
+    .select("person.id")
     .select("first_name")
-    .select_as("pet.name", "pet_name")
+    .select_as("pet.species", "kind")
 )
+row = await query.execute_take_first_or_throw()
+row["id"]       # int
+row["kind"]     # Literal["cat", "dog", "hamster"] | None  (left join)
+row["missing"]  # error
 ```
 
 `Database` returns the typed client named by the generated schema; for a
-plain schema it returns an ordinary `Pysely`. mypy and Pyright now reject
-unknown tables, unknown or unjoined columns, and values of the wrong type.
-`rows[0]["pet_name"]` is typed.
+plain schema it returns an ordinary `Pysely`. See [Schema and typing](typing.md)
+for what is checked.
 
 ## Keep it current
 
 | When | Command |
 | --- | --- |
-| Schema changed | `pysely codegen schema.py --output db.py` |
-| CI | `pysely codegen schema.py --output db.py --check` (fails if stale) |
+| Tables changed | `pysely codegen tables.py --output schema.py` |
+| CI | `pysely codegen tables.py --output schema.py --check` (fails if stale) |
 | On commit | pre-commit hook `pysely-codegen` from this repo |
-
-## Rules worth knowing
-
-- **Chain `.select()` per column** for typed result keys.
-  `.select(["a", "b"])` compiles but types rows as `dict[str, object]`:
-  mypy reads a list literal as `list[str]`, so its keys cannot be captured.
-- **Chained-call errors underline the whole chain.** Every typed method is an
-  overload set, and checkers report "No overloads match" on the full call
-  expression. The argument-level detail is in the same diagnostic.
-- **Qualify shared column names.** If `id` exists on two tables, write
-  `person.id`, even in a single-table query. The runtime is more lenient; the
-  checker cannot see query scope.
-- **Value suggestions after a join are a superset.** An editor may offer
-  literals from any joined table at the `where()` value position. Wrong values
-  are still errors.
 
 ## How it works
 
-The generator parses `schema.py` with `ast`. It never imports it, never runs
+The generator parses `tables.py` with `ast`. It never imports it, never runs
 it, and never touches a database. Output is deterministic and lint-clean.
+
+The typed classes carry one overload per column and live under
+`TYPE_CHECKING`; a slim runtime twin of each class sits beside them, so import
+time does not grow with the schema.
 
 Why generate at all: Python has no `keyof` or mapped types, so a checker can
 only see `Literal["species"]` if that literal exists in a real annotation.
@@ -105,7 +100,7 @@ works in every editor.
 
 ## Not yet
 
-`pysely introspect` — writing `db.py` straight from a live database — is
+`pysely introspect` — writing `tables.py` straight from a live database — is
 planned.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">

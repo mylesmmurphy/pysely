@@ -101,19 +101,16 @@ def compilation_dialect(name):
     return Dialect(PROFILES[name])
 
 
-def evaluate_playground(schema_code, query_code, dialect_name):
-    database_code = ""
+def evaluate_playground(tables_code, query_code, dialect_name):
+    schema_code = ""
     try:
-        # Exactly what `pysely codegen` writes for this schema. The playground
-        # runs the real generator so the typed interface always matches the
-        # schema editor rather than a file baked in at build time.
-        database_code = generate(schema_code, output="database.py")
+        # Exactly what `pysely codegen` writes for these tables. The playground
+        # runs the real generator so the typed schema always matches the
+        # tables editor rather than a file baked in at build time.
+        schema_code = generate(tables_code, output="schema.py")
         schema = types.ModuleType("schema")
         sys.modules["schema"] = schema
         exec(compile(schema_code, "schema.py", "exec"), schema.__dict__)
-        database = types.ModuleType("database")
-        sys.modules["database"] = database
-        exec(compile(database_code, "database.py", "exec"), database.__dict__)
         environment = types.ModuleType("playground")
         environment.dialect = compilation_dialect(dialect_name)
         sys.modules["playground"] = environment
@@ -124,7 +121,7 @@ def evaluate_playground(schema_code, query_code, dialect_name):
             {
                 "sql": format_sql(compiled.sql),
                 "parameters": compiled.parameters,
-                "database": database_code,
+                "schema": schema_code,
             },
             default=str,
         )
@@ -134,7 +131,7 @@ def evaluate_playground(schema_code, query_code, dialect_name):
             (
                 frame
                 for frame in reversed(frames)
-                if frame.filename in {"schema.py", "query.py"}
+                if frame.filename in {"tables.py", "schema.py", "query.py"}
             ),
             None,
         )
@@ -145,6 +142,6 @@ def evaluate_playground(schema_code, query_code, dialect_name):
                 or (frame.filename if frame else "query.py"),
                 "line": getattr(error, "lineno", None)
                 or (frame.lineno if frame else 1),
-                "database": database_code,
+                "schema": schema_code,
             }
         )

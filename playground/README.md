@@ -4,14 +4,16 @@ The documentation playground runs Pyright 1.1.413 in a browser worker. Monaco
 sends normal LSP requests to that worker; a separate Pyodide worker executes the
 same example against the real Pysely package.
 
-## Generated interface
+## Generated schema
 
-`workspace/database.py` is what `pysely codegen` writes for the schema editor's
+`workspace/schema.py` is what `pysely codegen` writes for the tables editor's
 contents. The Pyodide worker regenerates it on every run and pushes it to
-Pyright, so a column added in the schema pane is usable in the query pane at
-once. The committed `docs/assets/examples/database.py` is only the starting
-state; regenerate it with `pysely codegen docs/assets/examples/schema.py
---output docs/assets/examples/database.py`. CI fails when it drifts.
+Pyright, so a column added in the tables pane is usable in the query pane at
+once. When the tables do not parse, Pyright keeps the last good module and the
+schema.py tab says so. The committed `docs/assets/examples/schema.py` is only
+the starting state; regenerate it with `pysely codegen
+docs/assets/examples/tables.py --output docs/assets/examples/schema.py`. CI
+fails when it drifts.
 
 Pyright runs in `standard` mode, its default. `strict` adds unknown-type
 follow-on errors across a chain after one failed call.

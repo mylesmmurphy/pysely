@@ -23,7 +23,7 @@ self.onmessage = async ({ data }) => {
     const python = await runtime;
     const evaluate = python.globals.get("evaluate_playground");
     try {
-      self.postMessage({ id: data.id, ...JSON.parse(evaluate(data.schema, data.query, data.dialect)) });
+      self.postMessage({ id: data.id, ...JSON.parse(evaluate(data.tables, data.query, data.dialect)) });
     } finally { evaluate.destroy(); }
   } catch (error) {
     self.postMessage({ id: data.id, error: String(error) });

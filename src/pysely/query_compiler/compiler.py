@@ -13,6 +13,7 @@ from pysely.operation_node import (
     IdentifierNode,
     InsertQueryNode,
     IsNullNode,
+    NotNode,
     OperationNode,
     OrNode,
     ReferenceNode,
@@ -21,6 +22,7 @@ from pysely.operation_node import (
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
+    ValueListNode,
     ValueNode,
 )
 
@@ -34,6 +36,8 @@ class BindingProfile:
     identifier_open: str = '"'
     identifier_close: str = '"'
     returning_style: str | None = "returning"
+    supports_right_join: bool = True
+    supports_full_join: bool = True
 
     def bind(self, position: int) -> str:
         return self.placeholder.format(position=position)
@@ -93,8 +97,17 @@ class QueryCompiler:
         if node.from_:
             sql += " from " + ", ".join(self._compile(table) for table in node.from_)
         for join in node.joins:
+            if join.kind == "right" and not self.profile.supports_right_join:
+                raise UnsupportedFeatureError(
+                    f"{self.profile.name} does not support right joins"
+                )
+            if join.kind == "full" and not self.profile.supports_full_join:
+                raise UnsupportedFeatureError(
+                    f"{self.profile.name} does not support full joins"
+                )
             sql += (
-                f" inner join {self._compile(join.table)} on {self._compile(join.on)}"
+                f" {join.kind} join {self._compile(join.table)}"
+                f" on {self._compile(join.on)}"
             )
         if node.where:
             sql += " where " + self._compile(node.where)
@@ -191,6 +204,14 @@ class QueryCompiler:
         if isinstance(node, ValueNode):
             self._parameters.append(node.value)
             return self.profile.bind(len(self._parameters))
+        if isinstance(node, ValueListNode):
+            if not node.values:
+                raise InvalidQueryError("in() requires at least one value")
+            placeholders: list[str] = []
+            for value in node.values:
+                self._parameters.append(value)
+                placeholders.append(self.profile.bind(len(self._parameters)))
+            return "(" + ", ".join(placeholders) + ")"
         if isinstance(node, AliasNode):
             return f"{self._compile(node.node)} as {self._compile(node.alias)}"
         if isinstance(node, BinaryOperationNode):
@@ -206,6 +227,8 @@ class QueryCompiler:
         if isinstance(node, OrNode):
             expressions = " or ".join(self._compile(item) for item in node.expressions)
             return f"({expressions})"
+        if isinstance(node, NotNode):
+            return f"not ({self._compile(node.expression)})"
         if isinstance(node, SelectAllNode):
             if not node.table:
                 return "*"

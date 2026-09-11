@@ -6,7 +6,9 @@ from .nodes import (
     IdentifierNode,
     InsertQueryNode,
     IsNullNode,
+    JoinKind,
     JoinNode,
+    NotNode,
     OperationNode,
     OrNode,
     ReferenceNode,
@@ -15,6 +17,7 @@ from .nodes import (
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
+    ValueListNode,
     ValueNode,
 )
 from .transformer import OperationNodeTransformer
@@ -28,7 +31,9 @@ __all__ = [
     "IdentifierNode",
     "InsertQueryNode",
     "IsNullNode",
+    "JoinKind",
     "JoinNode",
+    "NotNode",
     "OperationNode",
     "OperationNodeTransformer",
     "OperationNodeVisitor",
@@ -39,5 +44,6 @@ __all__ = [
     "SelectQueryNode",
     "TableNode",
     "UpdateQueryNode",
+    "ValueListNode",
     "ValueNode",
 ]

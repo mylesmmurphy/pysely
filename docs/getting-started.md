@@ -25,7 +25,7 @@ Use one annotated class per table and a database class mapping table names to
 those types. This is the only file you write by hand.
 
 ```python
-# schema.py
+# tables.py
 from datetime import datetime
 from typing import Literal
 
@@ -48,11 +48,11 @@ class DatabaseSchema:
 Run the generator once, and again whenever the schema changes:
 
 ```bash
-pysely codegen schema.py --output db.py
+pysely codegen tables.py --output schema.py
 ```
 
-`db.py` is one self-contained module: your schema classes, now typed. Commit
-it. See [Code generation](codegen.md).
+`schema.py` is one self-contained module: your table classes, now typed.
+Commit it. See [Code generation](codegen.md).
 
 ## Connect and query
 
@@ -98,11 +98,11 @@ it. See [Code generation](codegen.md).
 Pass the generated schema and the dialect to Pysely:
 
 ```python
-from db import DatabaseSchema
+from schema import schema
 from pysely import Database
 
 
-db = Database(schema=DatabaseSchema, dialect=dialect)
+db = Database(schema=schema, dialect=dialect)
 rows = await (
     db.select_from("users")
     .select("id")
@@ -112,15 +112,15 @@ rows = await (
 )
 ```
 
-`rows` is `list[dict[Literal["id", "email"], int | str]]`. A misspelled column
-or a wrong value type is an editor error. Chain one `.select()` per column;
-the list form compiles but types rows as `dict[str, object]`.
+`rows[0]["id"]` is `int`, `rows[0]["email"]` is `str`, and `rows[0]["name"]`
+is an editor error, as is a misspelled column or a wrong value type. Chain one
+`.select()` per column; the list form compiles but reads keys as `object`.
 
 Pysely passes values to the driver separately from generated SQL.
 
 ### Without generation
 
-The same call with the hand-written `schema.DatabaseSchema` runs the same
+The same call with the hand-written `tables.DatabaseSchema` runs the same
 queries with runtime name validation only. No static checking; rows are
 `dict[str, object]`.
 

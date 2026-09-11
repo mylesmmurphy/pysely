@@ -1,0 +1,65 @@
+"""Negative typing fixture.
+
+Each line marked ``# error`` must raise a diagnostic under both checkers, and
+no other line may. Calls stay on one line so pyright's call-level range does
+not spill onto neighbours.
+"""
+
+from typing import LiteralString, assert_type
+
+from pysely import Database
+from test.fixtures.dialects import postgres_dialect
+from test.fixtures.schema import schema
+
+db = Database(schema=schema, dialect=postgres_dialect())
+person = db.select_from("person")
+joined = person.inner_join("pet", "owner_id", "person.id")
+
+# unknown or out-of-scope columns
+person.select("first_namee")  # error
+person.select("pet.name")  # error
+person.select("species")  # error
+person.select_as("pet.name", "pet_name")  # error
+person.where("species", "=", "dog")  # error
+person.where(lambda eb: eb("species", "=", "dog"))  # error
+person.where_ref("id", "=", "pet.owner_id")  # error
+person.select(["first_name", "pet.name"])  # error
+person.inner_join("pet", "toy.pet_id", "person.id")  # error
+person.inner_join("pet", "owner_id", "label")  # error
+db.select_from("persons")  # error
+
+# ambiguous bare names once two owners are in scope
+joined.select("id")  # error
+joined.where("id", "=", 1)  # error
+joined.select_as("id", "x")  # error
+joined.where_ref("id", "=", "pet.owner_id")  # error
+
+# wrong value shapes
+person.where("status", "=", "bogus")  # error
+person.where(lambda eb: eb("status", "=", "bogus"))  # error
+person.where("person.id", "=", "1")  # error
+person.where("last_name", "=", None)  # error
+person.where("first_name", "is", "x")  # error
+person.where("person.id", "like", "1%")  # error
+person.where("first_name", "in", "abc")  # error
+person.where("status", "in", ["bogus"])  # error
+person.where("first_name", "===", "x")  # error
+person.where(lambda eb: eb.ref("id", "=", "pet.id"))  # error
+
+# dynamic table names are not typed
+def dynamic_table(table: str) -> None:
+    db.select_from(table)  # error
+
+
+# result rows reject unknown keys
+async def keys() -> None:
+    row = await person.select("first_name").execute_take_first_or_throw()
+    row["missing"]  # error
+    row["last_name"]  # error
+    assert_type(row["first_name"], int)  # error
+    dropped = await person.select_as("pet.name", "x").execute_take_first_or_throw()  # error
+
+
+# a LiteralString alias is treated as one literal (upstream boundary; see docs)
+def literal_alias(alias: LiteralString) -> None:
+    person.select_as("first_name", alias)
