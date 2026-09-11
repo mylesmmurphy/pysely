@@ -51,11 +51,8 @@ Run the generator once, and again whenever the schema changes:
 pysely codegen schema.py --output db.py
 ```
 
-`db.py` is a single self-contained module. It carries your schema classes and
-a `Database` client whose methods know every table, column, and value type, so
-mypy and Pyright — and therefore Pylance in VS Code — check your queries and
-complete column names. Commit it; editors need no build step. See
-[Code generation](codegen.md) for `--check` and the pre-commit hook.
+`db.py` is one self-contained module: your schema classes plus a typed
+`Database` client. Commit it. See [Code generation](codegen.md).
 
 ## Connect and query
 
@@ -114,23 +111,16 @@ rows = await (
 )
 ```
 
-`rows` is typed as `list[dict[Literal["id", "email"], int | str]]`. A
-misspelled column, a column from a table you have not joined, or a value of the
-wrong type — `.where("role", "=", "owner")` when `role` is
-`Literal["admin", "member"]` — is an editor error before the query runs.
-
-Chain one `.select()` per column to keep result keys typed. The list form,
-`.select(["id", "email"])`, compiles to the same SQL but types its rows as
-`dict[str, object]`.
+`rows` is `list[dict[Literal["id", "email"], int | str]]`. A misspelled column
+or a wrong value type is an editor error. Chain one `.select()` per column;
+the list form compiles but types rows as `dict[str, object]`.
 
 Pysely passes values to the driver separately from generated SQL.
 
 ### Without the generated client
 
-The schema classes alone give runtime validation. `Pysely(schema=DatabaseSchema,
-dialect=dialect)` accepts the same queries and raises `InvalidQueryError` for an
-unknown table or column when the query is built — but nothing is checked
-statically, and results are `dict[str, object]`.
+`Pysely(schema=DatabaseSchema, dialect=dialect)` runs the same queries with
+runtime name validation only. No static checking; rows are `dict[str, object]`.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

@@ -6,18 +6,15 @@ same example against the real Pysely package.
 
 ## Generated interface
 
-The typed interface the editor checks against is produced by `pysely codegen`
-from the schema editor's contents, not baked in at build time. It is one
-self-contained module: it carries a copy of the schema classes and does not
-import `schema.py`. The Pyodide
-worker regenerates it on every run and the result is pushed to Pyright as
-`workspace/database.py`, so a column added in the schema pane is immediately
-usable in the query pane. `scripts/build-assets.mjs` bakes the committed
-generated file only as the starting state before the first run.
+`workspace/database.py` is what `pysely codegen` writes for the schema editor's
+contents. The Pyodide worker regenerates it on every run and pushes it to
+Pyright, so a column added in the schema pane is usable in the query pane at
+once. The committed `docs/assets/examples/database.py` is only the starting
+state; regenerate it with `pysely codegen docs/assets/examples/schema.py
+--output docs/assets/examples/database.py`. CI fails when it drifts.
 
-Do not hand-edit `docs/assets/examples/database.py`; regenerate it with
-`pysely codegen docs/assets/examples/schema.py --output
-docs/assets/examples/database.py`. CI fails when it drifts.
+Pyright runs in `standard` mode, its default. `strict` adds unknown-type
+follow-on errors across a chain after one failed call.
 
 ## Editor parity requirement
 

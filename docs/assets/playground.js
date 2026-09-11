@@ -20,7 +20,10 @@
       this.pending = new Map();
       this.diagnostics = () => {};
       this.settings = { python: { analysis: {
-        typeCheckingMode: "strict",
+        // Pyright's default. Strict adds "type of X is unknown" follow-on
+        // errors across the whole chain after one failed call, which buries
+        // the argument-level diagnostic users need.
+        typeCheckingMode: "standard",
         diagnosticMode: "openFilesOnly",
         extraPaths: ["/site-packages"],
         typeshedPaths: ["/typeshed-fallback"],
@@ -370,6 +373,7 @@
       const runButton = root.querySelector("#playground-run");
       const stopButton = root.querySelector("#playground-stop");
       const dialect = root.querySelector("#playground-dialect");
+      const codegenStatus = root.querySelector("#playground-codegen-status");
       const intelligenceStatus = root.querySelector("#playground-intelligence-status");
       const intelligenceRetry = root.querySelector("#playground-intelligence-retry");
       let stopIntelligence = () => {};
@@ -389,6 +393,8 @@
         stopButton.disabled = false;
         status.textContent = worker ? "Compiling" : "Loading Python";
         status.setAttribute("aria-busy", "true");
+        codegenStatus.textContent = "database.py: regenerating…";
+        delete codegenStatus.dataset.fresh;
         error.hidden = true;
         if (!worker) {
           worker = new Worker(assetUrl("playground-worker.js"), { type: "module" });
@@ -399,8 +405,16 @@
             stopButton.disabled = true;
             status.setAttribute("aria-busy", "false");
             if (data.database) {
+              const first = generated === undefined;
+              const changed = data.database !== generated;
               generated = data.database;
               pushGenerated(generated);
+              codegenStatus.textContent = first
+                ? "database.py: generated from schema.py"
+                : changed ? "database.py: regenerated from schema.py" : "database.py: up to date";
+              if (changed && !first) codegenStatus.dataset.fresh = "";
+            } else {
+              codegenStatus.textContent = "database.py: not regenerated (fix schema.py)";
             }
             if (data.error) {
               status.textContent = "Check your code";

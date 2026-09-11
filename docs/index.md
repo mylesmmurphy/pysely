@@ -19,9 +19,9 @@ rows = await (
 )
 ```
 
-Table, column, and value types come from one generated module built from your
-annotated schema classes — `pysely codegen schema.py --output db.py` — and are
-checked by mypy and Pyright with no plugin. See [Code generation](codegen.md).
+Types come from one generated module — `pysely codegen schema.py --output
+db.py` — checked by mypy and Pyright with no plugin. See
+[Code generation](codegen.md).
 
 ## Current database support
 

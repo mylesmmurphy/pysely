@@ -299,8 +299,11 @@ test("preserves stock Pyright diagnostics for an invalid join", async ({ page })
   ]));
   const result = await markers();
   expect(result.some((item: any) => item.code === "reportCallIssue")).toBe(true);
-  expect(result.some((item: any) => item.code === "reportUnknownMemberType")).toBe(true);
+  // Standard mode: no "type of X is unknown" cascade across the rest of the chain.
+  expect(result.some((item: any) => item.code === "reportUnknownMemberType")).toBe(false);
   expect(result.some((item: any) => item.owner === "pysely")).toBe(false);
+  const argument = result.find((item: any) => item.code === "reportArgumentType")!;
+  expect(argument.start).toBe(argument.end);
 });
 
 test("preserves Pyright diagnostics for an invalid where column", async ({ page }) => {

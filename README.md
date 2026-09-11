@@ -21,17 +21,14 @@ query = (
 compiled = query.compile()
 ```
 
-Define your tables as annotated classes, then generate one self-contained
-module that gives mypy and Pyright every table, column, and value type:
+Write your tables as annotated classes, generate one module, import it:
 
 ```bash
 pysely codegen schema.py --output db.py
 ```
 
-Import `Database` from `db.py` and nothing else. Python has no `keyof` or
-mapped types, so the literal column names have to exist in real annotations for
-a checker to see them; generation writes them once and serves both checkers with
-no plugin. See [Code generation](https://pysely.dev/codegen/).
+`db.py` gives mypy and Pyright every table, column, and value type. No checker
+plugin. See [Code generation](https://pysely.dev/codegen/).
 
 Install the development release with the driver extra for your database:
 
