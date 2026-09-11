@@ -4,6 +4,19 @@ The documentation playground runs Pyright 1.1.413 in a browser worker. Monaco
 sends normal LSP requests to that worker; a separate Pyodide worker executes the
 same example against the real Pysely package.
 
+## Generated interface
+
+The typed interface the editor checks against is produced by `pysely codegen`
+from the schema editor's contents, not baked in at build time. The Pyodide
+worker regenerates it on every run and the result is pushed to Pyright as
+`workspace/database.py`, so a column added in the schema pane is immediately
+usable in the query pane. `scripts/build-assets.mjs` bakes the committed
+generated file only as the starting state before the first run.
+
+Do not hand-edit `docs/assets/examples/database.py`; regenerate it with
+`pysely codegen docs/assets/examples/schema.py --output
+docs/assets/examples/database.py`. CI fails when it drifts.
+
 ## Editor parity requirement
 
 The playground must represent the Python editing experience users get in VS Code.

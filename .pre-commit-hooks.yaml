@@ -1,0 +1,7 @@
+- id: pysely-codegen
+  name: pysely codegen
+  description: Regenerate the typed query interface from annotated schema classes.
+  entry: pysely codegen
+  language: python
+  pass_filenames: false
+  require_serial: true

@@ -4,6 +4,7 @@ import traceback
 import types
 
 from pysely import Dialect
+from pysely.codegen import generate
 from pysely.query_compiler import BindingProfile
 
 SQL_CLAUSES = (
@@ -100,8 +101,13 @@ def compilation_dialect(name):
     return Dialect(PROFILES[name])
 
 
-def evaluate_playground(schema_code, database_code, query_code, dialect_name):
+def evaluate_playground(schema_code, query_code, dialect_name):
+    database_code = ""
     try:
+        # Exactly what `pysely codegen` writes for this schema. The playground
+        # runs the real generator so the typed interface always matches the
+        # schema editor rather than a file baked in at build time.
+        database_code = generate(schema_code)
         schema = types.ModuleType("schema")
         sys.modules["schema"] = schema
         exec(compile(schema_code, "schema.py", "exec"), schema.__dict__)
@@ -118,6 +124,7 @@ def evaluate_playground(schema_code, database_code, query_code, dialect_name):
             {
                 "sql": format_sql(compiled.sql),
                 "parameters": compiled.parameters,
+                "database": database_code,
             },
             default=str,
         )
@@ -138,5 +145,6 @@ def evaluate_playground(schema_code, database_code, query_code, dialect_name):
                 or (frame.filename if frame else "query.py"),
                 "line": getattr(error, "lineno", None)
                 or (frame.lineno if frame else 1),
+                "database": database_code,
             }
         )

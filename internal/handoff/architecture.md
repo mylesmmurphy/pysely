@@ -132,9 +132,9 @@ Retain Kysely's singular `test/` and `example/` where convenient. Replace hyphen
 
 Use `pyproject.toml`, commit `uv.lock`, and use `uv sync --locked` in CI. Use a conventional build backend such as Hatchling, with a verified bounded build requirement. Let uv resolve actual current package versions, commit the lock, and avoid fabricated version numbers in setup instructions.
 
-Core should stay small: stdlib plus `typing_extensions` only when needed. No dependency on SQLAlchemy or a TypeScript runtime for execution. Driver packages are optional extras, with lazy imports and useful missing-extra errors. The mypy extra declares a tested supported mypy range; codegen may use stdlib argparse and Python source rendering initially. JSON/runtime validation helpers remain optional.
+Core should stay small: stdlib plus `typing_extensions` only when needed. No dependency on SQLAlchemy or a TypeScript runtime for execution. Driver packages are optional extras, with lazy imports and useful missing-extra errors. Codegen uses stdlib `ast`, `argparse`, and Python source rendering, so it needs no extra. JSON/runtime validation helpers remain optional.
 
-Proposed extras: `postgres`, `mysql`, `sqlite`, `mssql`, `mypy`, `codegen`. Proposed development groups: `dev`, `docs`, `bench`. Development includes pytest, pytest-asyncio, pytest-cov, Hypothesis, Ruff, mypy, Pyright, and packaging validation tools. Do not include the mypy runtime dependency in a normal import path.
+Proposed extras: `postgres`, `mysql`, `sqlite`, `mssql`. Proposed development groups: `dev`, `docs`, `bench`. Development includes pytest, pytest-asyncio, pytest-cov, Hypothesis, Ruff, mypy, Pyright, and packaging validation tools. Codegen ships in the core package and has no runtime dependency.
 
 Bootstrap with `uv init --lib --build-backend hatchling pysely` only if there is no existing project. Configure the package and groups before using the following intended repository commands:
 
@@ -215,8 +215,9 @@ Provide typed library exceptions for invalid query, unsupported feature, no resu
 ## 6. Type architecture: two explicitly tested contracts
 
 Direction update: generated schema-specific interfaces and ordinary Python typing
-are the default developer experience. The mypy plugin is optional enhancement,
-not the foundation of the public API. Custom editor services remain paused.
+are the developer experience. `pysely codegen` writes them from the annotated
+schema classes, and the mypy plugin has been removed (ADR 0006). Custom editor
+services remain paused.
 
 ### 6.1 Portable typing
 
@@ -224,9 +225,11 @@ Ordinary Python types provide generated table/column attributes, expression valu
 
 Exact arbitrary named projections, scope-sensitive aliases, and outer-join shape transformations are not promised from ordinary annotations alone. Portable fallback results must be conservative, such as `dict[str, object]`, rather than an incorrectly precise `UserRow`. Tuple APIs may use overloads where sound, but must not ignore join-induced nullability. Typed values alone do not prove a column belongs to the current query scope.
 
-### 6.2 Optional enhanced mypy inference
+### 6.2 Generated interfaces instead of a checker plugin
 
-Preserve an optional mypy plugin that interprets Pysely's known API and schema metadata, constructs selected-row TypedDict types, and propagates query state. It operates on static declarations and checker AST/type objects, not database connections or execution of application code. These capabilities are not baseline release gates when generated standard types provide the documented behavior.
+`pysely codegen` parses the schema module with `ast` and writes the literal column types, per-column overloads, and selected-row shapes that both checkers read as ordinary source. It never imports the schema, executes application code, or connects to a database. Because Pyright has no plugin interface and Pylance is the primary editor target, generation is the only mechanism that serves both checkers from one implementation; the previous `pysely.mypy` plugin duplicated these rules for mypy alone and was removed.
+
+Generated output is committed so editors need no build step. `pysely codegen --check` gates drift in CI and in the published pre-commit hook.
 
 Model internal query type state as conceptually `Query[Database, Scope, Projection, Mode]`. Scope records source identity, alias, accessible columns, correlation rules, and null extension. Projection records output name, value type, source provenance, and conditional presence. These states must survive helper functions, module imports, builder reassignment, and mypy incremental caches. The precise serializable representation is an initial implementation decision to prove with tests.
 
@@ -245,7 +248,7 @@ Core inference rules:
 9. Insert/update checking respects omission/defaultability separately from NULL acceptance and supports typed SQL expressions as values.
 10. Returning/output results use projection rules and dialect semantics. Read-only clients restrict writes at the appropriate API boundary.
 
-Mypy hooks can change inference but do not automatically add Pylance/Pyright completions. Publish a checker capability table. Do not market exact named result inference in all editors until executable editor/checker tests establish it. If broader editor inference becomes mandatory, specify a separate language-server or generated-query-artifact project; do not disguise it as a routine schema-codegen feature.
+Generated source serves mypy and Pyright alike; a checker plugin would have served only mypy. Publish a checker capability table. Do not market exact named result inference in all editors until executable editor/checker tests establish it. If broader editor inference becomes mandatory, specify a separate language-server or generated-query-artifact project; do not disguise it as a routine schema-codegen feature.
 
 Keep a documented explicit `assert_type`/cast escape hatch, matching the purpose of Kysely's helpers, and distinguish static assertions from runtime validation. Never use casts or `Any` internally just to make expected-error fixtures pass. Unknown database types default to `object` with diagnostics or a required override.
 

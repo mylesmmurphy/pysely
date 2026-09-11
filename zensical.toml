@@ -11,6 +11,7 @@ nav = [
   { "Getting started" = "getting-started.md" },
   { "Queries" = "queries.md" },
   { "Schema and typing" = "typing.md" },
+  { "Code generation" = "codegen.md" },
   { "Dialects" = "dialects.md" },
   { "Project status" = "project-status.md" },
   { "Roadmap" = "ROADMAP.md" },

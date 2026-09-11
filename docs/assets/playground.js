@@ -108,6 +108,22 @@
       this.notify("textDocument/didClose", { textDocument: { uri: model.uri.toString() } });
     }
 
+    // database.py is written by `pysely codegen`, not by hand. The playground
+    // regenerates it from the schema editor on every run and pushes it here so
+    // Pyright checks the interface the schema actually produces.
+    updateGenerated(text) {
+      if (typeof text !== "string" || this.generated === text) return;
+      const uri = "file:///workspace/database.py";
+      const version = (this.generatedVersion = (this.generatedVersion || 0) + 1);
+      if (this.generated === undefined) {
+        this.notify("textDocument/didOpen", { textDocument: { uri, languageId: "python", version, text } });
+      } else {
+        this.notify("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
+      }
+      this.generated = text;
+      this.files["workspace/database.py"] = text;
+    }
+
     textRequest(method, model, position, token, extra = {}) {
       return this.request(method, {
         textDocument: { uri: model.uri.toString() },
@@ -261,11 +277,14 @@
       status.textContent = `Python suggestions ready · Pyright ${manifest.pyrightVersion}`;
       status.setAttribute("aria-busy", "false");
       status.dataset.startupMs = String(Math.round(performance.now() - startedAt));
-      return () => {
-        models.slice(0, 2).forEach(model => client.close(model));
-        disposables.forEach(item => item.dispose());
-        readonlyModels.forEach(model => model.dispose());
-        client.dispose();
+      return {
+        update: text => client.updateGenerated(text),
+        dispose: () => {
+          models.slice(0, 2).forEach(model => client.close(model));
+          disposables.forEach(item => item.dispose());
+          readonlyModels.forEach(model => model.dispose());
+          client.dispose();
+        },
       };
     } catch (failure) {
       client?.dispose();
@@ -354,6 +373,8 @@
       const intelligenceStatus = root.querySelector("#playground-intelligence-status");
       const intelligenceRetry = root.querySelector("#playground-intelligence-retry");
       let stopIntelligence = () => {};
+      let pushGenerated = () => {};
+      let generated;
       let worker;
       let id = 0;
       let timer;
@@ -377,6 +398,10 @@
             runButton.disabled = false;
             stopButton.disabled = true;
             status.setAttribute("aria-busy", "false");
+            if (data.database) {
+              generated = data.database;
+              pushGenerated(generated);
+            }
             if (data.error) {
               status.textContent = "Check your code";
               error.textContent = data.error;
@@ -425,15 +450,20 @@
       editors[1].addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
       const loadIntelligence = () => {
         stopIntelligence();
+        pushGenerated = () => {};
         return startIntelligence(monaco, models, intelligenceStatus, intelligenceRetry)
-          .then(dispose => {
-            if (!root.isConnected || version !== mountVersion) dispose();
-            else stopIntelligence = dispose;
+          .then(intelligence => {
+            if (!root.isConnected || version !== mountVersion) intelligence.dispose();
+            else {
+              stopIntelligence = intelligence.dispose;
+              pushGenerated = intelligence.update;
+              if (generated) pushGenerated(generated);
+            }
           })
           .catch(failure => { console.error("Could not start Pyright", failure); });
       };
       intelligenceRetry.onclick = loadIntelligence;
-      cleanup = () => { stop(); stopIntelligence(); observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
+      cleanup = () => { stop(); stopIntelligence(); pushGenerated = () => {}; observer.disconnect(); window.removeEventListener("resize", fitEditors); subscriptions.forEach(item => item.dispose()); editors.forEach(editor => editor.dispose()); models.forEach(model => model.dispose()); };
       setTimeout(() => loadIntelligence().finally(run), 500);
     } catch (failure) {
       status.textContent = "Could not load playground";

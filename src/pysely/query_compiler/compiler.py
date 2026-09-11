@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import copy
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
@@ -53,6 +54,18 @@ class QueryCompiler:
         self._parameters: list[object] = []
 
     def compile(
+        self, node: RootOperationNode, query_id: str
+    ) -> CompiledQuery[dict[str, object]]:
+        """Compile a query.
+
+        Bound parameters are collected while walking the tree, so each call
+        works on its own copy. A single compiler is shared by every query on a
+        client, and without this concurrent callers would interleave their
+        parameter lists.
+        """
+        return copy(self)._compile_root(node, query_id)
+
+    def _compile_root(
         self, node: RootOperationNode, query_id: str
     ) -> CompiledQuery[dict[str, object]]:
         self._parameters = []

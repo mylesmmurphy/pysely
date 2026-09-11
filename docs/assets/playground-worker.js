@@ -12,21 +12,18 @@ async function initialize() {
   await python.loadPackage("micropip");
   const wheel = assetUrl("../wheels/pysely-0.1.0.dev0-py3-none-any.whl").href;
   await python.runPythonAsync(`import micropip\nawait micropip.install(${JSON.stringify(wheel)}, deps=False)`);
-  const [bridge, database] = await Promise.all([
-    fetch(assetUrl("playground.py")),
-    fetch(assetUrl("examples/database.py")),
-  ]);
-  if (!bridge.ok || !database.ok) throw new Error("Could not load playground support");
+  const bridge = await fetch(assetUrl("playground.py"));
+  if (!bridge.ok) throw new Error("Could not load playground support");
   await python.runPythonAsync(await bridge.text());
-  return { python, database: await database.text() };
+  return python;
 }
 self.onmessage = async ({ data }) => {
   try {
     runtime ??= initialize();
-    const { python, database } = await runtime;
+    const python = await runtime;
     const evaluate = python.globals.get("evaluate_playground");
     try {
-      self.postMessage({ id: data.id, ...JSON.parse(evaluate(data.schema, database, data.query, data.dialect)) });
+      self.postMessage({ id: data.id, ...JSON.parse(evaluate(data.schema, data.query, data.dialect)) });
     } finally { evaluate.destroy(); }
   } catch (error) {
     self.postMessage({ id: data.id, error: String(error) });

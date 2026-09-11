@@ -242,6 +242,35 @@ test("uses readable tab URLs", async ({ page }) => {
   await expect(page.locator('input[id^="__tabbed_"]')).toHaveCount(0);
 });
 
+test("regenerates the typed interface from the schema editor", async ({ page }) => {
+  await page.goto("/playground/");
+  await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");
+  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
+
+  // A column added in the schema editor must become usable in the query editor
+  // without a rebuild: the playground runs `pysely codegen` on every run.
+  await page.evaluate(() => {
+    const monaco = (window as any).monaco;
+    const schema = monaco.editor.getModel(monaco.Uri.parse("file:///workspace/schema.py"));
+    schema.setValue(schema.getValue().replace("    verified: bool\n", "    verified: bool\n    nickname: str | None\n"));
+  });
+  await page.evaluate(code => {
+    const monaco = (window as any).monaco;
+    monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
+  }, `${prefix}compiled = db.select_from("person").select("nickname").compile()`);
+
+  await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
+  await expect(page.locator("#playground-sql")).toContainText('select "nickname"');
+
+  const markers = () => page.evaluate(() => {
+    const monaco = (window as any).monaco;
+    return monaco.editor.getModelMarkers({}).filter(
+      (item: any) => item.resource.path === "/workspace/query.py",
+    ).length;
+  });
+  await expect.poll(markers, { timeout: 40_000 }).toBe(0);
+});
+
 test("preserves stock Pyright diagnostics for an invalid join", async ({ page }) => {
   await page.goto("/playground/");
   await expect(page.locator("#playground-intelligence-status")).toContainText("suggestions ready");

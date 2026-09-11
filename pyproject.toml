@@ -21,6 +21,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.scripts]
+pysely = "pysely.cli:main"
+
 [project.urls]
 Documentation = "https://pysely.dev"
 Repository = "https://github.com/mylesmmurphy/pysely"
@@ -68,6 +71,12 @@ packages = ["pysely"]
 mypy_path = "src"
 
 [tool.pyright]
-include = ["src", "test/typings", "test/fixtures/portable_schema.py"]
+include = [
+  "src",
+  "test/typings",
+  "test/fixtures/portable_schema.py",
+  "docs/assets/examples",
+]
+extraPaths = ["docs/assets/examples"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"

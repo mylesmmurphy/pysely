@@ -4,6 +4,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
+from pysely.codegen import generate
+
 
 def test_playground_formats_compiled_sql_by_clause() -> None:
     namespace = runpy.run_path("docs/assets/playground.py")
@@ -23,20 +25,38 @@ def test_playground_formats_compiled_sql_by_clause() -> None:
 
 def test_playground_compiles_example_with_each_dialect() -> None:
     namespace = runpy.run_path("docs/assets/playground.py")
-    evaluate = cast(
-        Callable[[str, str, str, str], str], namespace["evaluate_playground"]
-    )
+    evaluate = cast(Callable[[str, str, str], str], namespace["evaluate_playground"])
     example_dir = Path("docs/assets/examples")
     schema = (example_dir / "schema.py").read_text()
-    database = (example_dir / "database.py").read_text()
     query = (example_dir / "query.py").read_text()
 
     for dialect in ("postgres", "mysql", "sqlite"):
-        result = cast(
-            dict[str, Any], json.loads(evaluate(schema, database, query, dialect))
-        )
+        result = cast(dict[str, Any], json.loads(evaluate(schema, query, dialect)))
         assert "error" not in result
         assert "pet_name" in result["sql"]
+        assert result["database"] == generate(schema)
+
+
+def test_playground_regenerates_the_interface_from_the_schema_editor() -> None:
+    """A column added in the schema editor must work without a rebuild."""
+    namespace = runpy.run_path("docs/assets/playground.py")
+    evaluate = cast(Callable[[str, str, str], str], namespace["evaluate_playground"])
+    schema = (Path("docs/assets/examples") / "schema.py").read_text()
+    edited = schema.replace(
+        "    verified: bool\n", "    verified: bool\n    nickname: str | None\n"
+    )
+    query = (
+        "from database import Database\n"
+        "from playground import dialect\n"
+        "db = Database(dialect=dialect)\n"
+        'compiled = db.select_from("person").select("nickname").compile()\n'
+    )
+
+    result = cast(dict[str, Any], json.loads(evaluate(edited, query, "postgres")))
+
+    assert "error" not in result
+    assert result["sql"] == 'select "nickname"\nfrom "person"'
+    assert '"person.nickname",' in result["database"]
 
 
 def test_playground_dialect_is_compilation_only() -> None:

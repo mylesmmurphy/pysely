@@ -11,10 +11,12 @@ not duplicate SQL construction or execution. Strict generated entry points avoid
 blanket `str` overload because that would accept misspellings and suppress useful
 literal completion.
 
-The `pysely codegen` command and database introspection are not implemented.
-Arbitrary projection aliases and some column-to-value relationships remain beyond
-the portable contract. The optional `pysely.mypy` plugin may provide stronger
-checks, but it is not a runtime dependency.
+Database introspection is not implemented. Arbitrary projection aliases and some
+column-to-value relationships remain beyond the portable contract.
+
+Superseded in part by [ADR 0006](0006-generated-typed-interfaces.md): the typed
+entry points are now written by `pysely codegen`, and the optional `pysely.mypy`
+plugin has been removed in favour of generated source that both checkers read.
 
 The docs playground runs real Python compilation and stock browser-hosted Pyright.
 Its language intelligence must represent VS Code using the same public types and

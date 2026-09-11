@@ -20,6 +20,18 @@ query = (
 compiled = query.compile()
 ```
 
+Annotated schema classes validate table and column names at runtime. For static
+checking in mypy and Pyright, generate a typed interface from the same classes:
+
+```bash
+pysely codegen schema.py --output db.py
+```
+
+Python has no `keyof` or mapped types, so the literal column names have to exist
+in real annotations for a checker to see them. Generation writes them once and
+serves both checkers; no checker plugin is required. See
+[Code generation](https://pysely.dev/codegen/).
+
 Install the development release with the driver extra for your database:
 
 ```bash
