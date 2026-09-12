@@ -102,10 +102,6 @@ class Table:
         return f"{self.alias}Query"
 
     @property
-    def builder_class(self) -> str:
-        return f"{self.alias}ExpressionBuilder"
-
-    @property
     def token(self) -> str:
         return f'Literal["{self.attribute}"]'
 
@@ -495,54 +491,25 @@ class _Renderer:
             ]
         )
 
-    def having(
-        self,
-        table: Table | None,
-        names_for: Callable[[Column], list[str]] | None,
-        query: Sub,
-        builder: str,
-        tables: Callable[[Table], Sub] | None = None,
-    ) -> None:
-        """having: the where shapes, applied after group_by."""
-        model = self.model
-        for item in [table] if table is not None else model.tables:
-            receiver = tables(item) if tables is not None else query
-            for names, operator, shape in self.shapes(
-                item, names_for or self.scope_names(item)
-            ):
-                self.overload(
-                    "having",
-                    [
-                        ("self", receiver),
-                        ("column", _literal(names)),
-                        ("operator", operator),
-                        ("value", shape),
-                    ],
-                    receiver,
-                )
-        self.overload(
-            "having",
-            [
-                ("self", None),
-                ("column", Sub("Callable", (Sub("", (builder,)), "Expression[bool]"))),
-            ],
-            query,
-        )
+    def having(self, query: Sub, builder: str) -> None:
+        """having: callback form only, to stay under pyright's per-module
+        definition ceiling; the builder carries the typed operator shapes."""
         self.emit(
             _signature(
                 "having",
                 [
                     ("self", None),
-                    ("column", "Any"),
-                    ("operator: Any = None", None),
-                    ("value: Any = None", None),
+                    (
+                        "column",
+                        Sub("Callable", (Sub("", (builder,)), "Expression[bool]")),
+                    ),
                 ],
-                "Any",
+                query,
                 8,
                 body="",
             )
         )
-        self.emit(["            return self._having(column, operator, value)", ""])
+        self.emit(["            return self._having(cast(Any, column))", ""])
 
     def shapes(
         self, table: Table, names_for: Callable[[Column], list[str]]
@@ -631,8 +598,6 @@ class _Renderer:
         self.aliases()
         self.emit(["", "if TYPE_CHECKING:"])
         self.joined_builder()
-        for table in model.tables:
-            self.table_builder(table)
         self.joined_query()
         self.single_table_base()
         for table in model.tables:
@@ -768,6 +733,29 @@ class _Renderer:
             ]
         )
         for table in self.model.tables:
+            # Bare names shared with other tables are valid while this table is
+            # alone in the query: an exact-scope overload set for just those.
+            shared = [c for c in table.columns if self.model.shared(c.name)]
+            if shared:
+                exact = Sub(
+                    "DatabaseExpressionBuilder", (table.token, table.columns_alias)
+                )
+                subset = Table(
+                    table.attribute, table.class_name, table.alias, tuple(shared)
+                )
+                for names, operator, value in self.shapes(
+                    subset, lambda column: [column.name]
+                ):
+                    self.overload(
+                        "__call__",
+                        [
+                            ("self", exact),
+                            ("column", _literal(names)),
+                            ("operator", operator),
+                            ("value", value),
+                        ],
+                        "Expression[bool]",
+                    )
             receiver = Sub(
                 "DatabaseExpressionBuilder", (f"TablesT | {table.token}", "ColumnT")
             )
@@ -784,29 +772,7 @@ class _Renderer:
                 )
         self.builder_impl()
 
-    def table_builder(self, table: Table) -> None:
-        self.emit(
-            [
-                f"    class {table.builder_class}("
-                f"ExpressionBuilder[{table.columns_alias}]):"
-            ]
-        )
-        for names, operator, value in self.shapes(table, self.all_names(table)):
-            self.overload(
-                "__call__",
-                [
-                    ("self", None),
-                    ("column", _literal(names)),
-                    ("operator", operator),
-                    ("value", value),
-                ],
-                "Expression[bool]",
-            )
-        self.builder_impl()
-
-    # --- query classes
-
-    def select_impls(self, cls: str, builder: str) -> None:
+    def select_impls(self) -> None:
         self.emit(
             [
                 "        def select(self, selections: Any) -> Any:",
@@ -860,7 +826,7 @@ class _Renderer:
                 "TablesT", "ColumnT", "NullT", self.cons("str", "object"), "StarT"
             ),
         )
-        self.select_impls("DatabaseQuery", "DatabaseExpressionBuilder")
+        self.select_impls()
         self.emit(
             ["        # select_as: grouped by value type; the alias becomes a key."]
         )
@@ -936,13 +902,8 @@ class _Renderer:
         )
         self.where_impl()
         self.having(
-            None,
-            None,
             self.joined("TablesT", "ColumnT", "NullT", "FieldsT", "StarT"),
             "DatabaseExpressionBuilder[TablesT, ColumnT]",
-            lambda table: self.joined(
-                f"TablesT | {table.token}", "ColumnT", "NullT", "FieldsT", "StarT"
-            ),
         )
         self.ordering(
             lambda fields: self.joined("TablesT", "ColumnT", "NullT", fields, "StarT"),
@@ -1091,7 +1052,7 @@ class _Renderer:
             ],
             Sub(cls, (self.cons("str", "object"),)),
         )
-        self.select_impls(cls, table.builder_class)
+        self.select_impls()
         for (value, is_nullable), names in self.by_value(
             table, self.all_names(table)
         ).items():
@@ -1124,19 +1085,17 @@ class _Renderer:
                 ],
                 result,
             )
+        builder = f"DatabaseExpressionBuilder[{table.token}, {table.columns_alias}]"
         self.overload(
             "where",
             [
                 ("self", None),
-                (
-                    "column",
-                    f"Callable[[{table.builder_class}], Expression[bool]]",
-                ),
+                ("column", Sub("Callable", (Sub("", (builder,)), "Expression[bool]"))),
             ],
             result,
         )
         self.where_impl()
-        self.having(table, self.all_names(table), result, table.builder_class)
+        self.having(result, builder)
         self.ordering(lambda fields: Sub(cls, (fields,)), table.columns_alias)
 
     def client_class(self) -> None:
@@ -1156,9 +1115,9 @@ class _Renderer:
         self.emit(
             [
                 "        def select_from(self, table: str) -> Any:",
-                "            query_class, builder = _QUERIES[table]",
-                "            query = super().select_from(table).typed(builder)",
-                "            return query_class(cast(Any, query))",
+                "            query = super().select_from(table)",
+                "            typed = query.typed(DatabaseExpressionBuilder)",
+                "            return _QUERIES[table](cast(Any, typed))",
                 "",
             ]
         )
@@ -1176,8 +1135,8 @@ class _Renderer:
                 "        def select_as(self, source, alias):",
                 "            return self._select_as(source, alias)",
                 "",
-                "        def having(self, column, operator=None, value=None):",
-                "            return self._having(column, operator, value)",
+                "        def having(self, column):",
+                "            return self._having(column)",
                 "",
                 '        def order_by(self, column, direction="asc"):',
                 "            return self._order_by(column, direction)",
@@ -1198,8 +1157,8 @@ class _Renderer:
                 "        def select_as(self, source, alias):",
                 "            return self._select_as(source, alias)",
                 "",
-                "        def having(self, column, operator=None, value=None):",
-                "            return self._having(column, operator, value)",
+                "        def having(self, column):",
+                "            return self._having(column)",
                 "",
                 '        def order_by(self, column, direction="asc"):',
                 "            return self._order_by(column, direction)",
@@ -1220,9 +1179,6 @@ class _Renderer:
         for table in model.tables:
             self.emit(
                 [
-                    f"    class {table.builder_class}(ExpressionBuilder):",
-                    "        pass",
-                    "",
                     f"    class {table.query_class}(SingleTableQuery):",
                     "        pass",
                     "",
@@ -1232,29 +1188,42 @@ class _Renderer:
             [
                 "    class DatabaseClient(Pysely):",
                 "        def select_from(self, table):",
-                "            query_class, builder = _QUERIES[table]",
-                "            query = super().select_from(table).typed(builder)",
-                "            return query_class(query)",
+                "            query = super().select_from(table)",
+                "            typed = query.typed(DatabaseExpressionBuilder)",
+                "            return _QUERIES[table](typed)",
                 "",
                 "",
-                "# The query and expression-builder classes behind each table name.",
-                "_QUERIES: dict[str, tuple[type[Any], type[Any]]] = {",
+                "# The single-table query class behind each table name.",
+                "_QUERIES: dict[str, type[Any]] = {",
             ]
         )
         self.emit(
-            [
-                f'    "{table.attribute}": ({table.query_class}, '
-                f"{table.builder_class}),"
-                for table in model.tables
-            ]
+            [f'    "{table.attribute}": {table.query_class},' for table in model.tables]
         )
         self.emit(["}"])
+
+
+# Pyright stops analysing a module whose top-level code flow exceeds its
+# complexity limit; empirically that is about 15,000 function definitions.
+PYRIGHT_DEFINITION_CEILING = 14_000
 
 
 def render(
     model: SchemaModel, *, source: str = "tables.py", output: str = "schema.py"
 ) -> str:
-    return _Renderer(model).render(source=source, output=output)
+    rendered = _Renderer(model).render(source=source, output=output)
+    definitions = sum(
+        line.lstrip().startswith("def ") for line in rendered.splitlines()
+    )
+    if definitions > PYRIGHT_DEFINITION_CEILING:
+        raise SchemaError(
+            f"{model.database} would need {definitions} typed method definitions; "
+            f"Pyright stops analysing a module above about "
+            f"{PYRIGHT_DEFINITION_CEILING}. Split the tables across several "
+            "database classes (one generated module each), or drop columns "
+            "that queries never touch."
+        )
+    return rendered
 
 
 def generate(

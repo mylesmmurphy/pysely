@@ -360,7 +360,7 @@ def test_ordering_paging_grouping_and_set_operations_compile() -> None:
         person.select("status")
         .select_as("person.id", "pid")
         .group_by(["status", "person.id"])
-        .having("status", "=", "active")
+        .having(lambda eb: eb("status", "=", "active"))
         .order_by("pid", "desc")
         .order_by("first_name")
         .limit(10)
@@ -431,7 +431,7 @@ async def test_ordering_paging_and_set_operations_execute(tmp_path: Path) -> Non
         grouped = await (
             person.select("status")
             .group_by("status")
-            .having("status", "=", "active")
+            .having(lambda eb: eb("status", "=", "active"))
             .execute()
         )
         names = await (

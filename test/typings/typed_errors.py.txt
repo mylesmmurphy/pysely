@@ -71,7 +71,7 @@ person.select("first_name").order_by("first_name", "sideways")  # error
 person.select("first_name").order_by("nickname")  # error
 person.select("first_name").limit("10")  # error
 person.select("status").group_by("species")  # error
-person.select("status").having("status", "=", "bogus")  # error
+person.select("status").having(lambda eb: eb("status", "=", "bogus"))  # error
 person.select("first_name").union(person.select("last_name"))  # error
 person.select("first_name").union(person.select_as("last_name", "first_name"))  # error
 person.select("first_name").union(db.select_from("pet").select("name"))  # error

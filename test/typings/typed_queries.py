@@ -206,7 +206,9 @@ person.select("first_name").order_by("last_name").order_by("id", "desc")
 person.select("first_name").select_as("person.id", "pid").order_by("pid", "desc")
 joined.select("pet.name").order_by("person.id").order_by("name")
 person.select("id").limit(10).offset(20)
-person.select("status").group_by("status").having("status", "=", "active")
+person.select("status").group_by("status").having(
+    lambda eb: eb("status", "=", "active")
+)
 joined.select("species").group_by(["species", "person.id"]).having(
     lambda eb: eb("species", "in", ["cat", "dog"])
 )

@@ -354,13 +354,8 @@ class TypedSchemaQueryBuilder(Generic[DatabaseT, ColumnsT, FieldsT, StarT]):
         values = cast(str | Sequence[str], columns)
         return replace(self, _query=self._query.group_by(values))
 
-    def _having(
-        self,
-        column: str | ExpressionCallback,
-        operator: SchemaComparisonOperator | None = None,
-        value: object = None,
-    ) -> Self:
-        return replace(self, _query=self._query.having(column, operator, value))
+    def _having(self, column: ExpressionCallback) -> Self:
+        return replace(self, _query=self._query.having(column))
 
     def _order_by(self, column: str, direction: OrderDirection = "asc") -> Self:
         return replace(self, _query=self._query.order_by(column, direction))

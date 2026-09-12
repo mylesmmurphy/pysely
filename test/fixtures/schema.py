@@ -173,6 +173,30 @@ if TYPE_CHECKING:
     ):
         @overload
         def __call__(
+            self: DatabaseExpressionBuilder[Literal["person"], PersonColumns],
+            column: Literal["id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["person"], PersonColumns],
+            column: Literal["id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["person"], PersonColumns],
+            column: Literal["id"],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
             self: DatabaseExpressionBuilder[TablesT | Literal["person"], ColumnT],
             column: Literal["person.id"],
             operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
@@ -254,6 +278,54 @@ if TYPE_CHECKING:
                 "person.status",
                 "status",
             ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["pet"], PetColumns],
+            column: Literal["id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["pet"], PetColumns],
+            column: Literal["id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["pet"], PetColumns],
+            column: Literal["name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["pet"], PetColumns],
+            column: Literal["name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["pet"], PetColumns],
+            column: Literal["name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["pet"], PetColumns],
+            column: Literal["id", "name"],
             operator: Literal["is", "is not"],
             value: None,
         ) -> Expression[bool]: ...
@@ -352,6 +424,54 @@ if TYPE_CHECKING:
                 "pet.born",
                 "born",
             ],
+            operator: Literal["is", "is not"],
+            value: None,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["toy"], ToyColumns],
+            column: Literal["id"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: int,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["toy"], ToyColumns],
+            column: Literal["id"],
+            operator: Literal["in", "not in"],
+            value: list[int] | tuple[int, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["toy"], ToyColumns],
+            column: Literal["name"],
+            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["toy"], ToyColumns],
+            column: Literal["name"],
+            operator: Literal["in", "not in"],
+            value: list[str] | tuple[str, ...],
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["toy"], ToyColumns],
+            column: Literal["name"],
+            operator: Literal["like", "not like"],
+            value: str,
+        ) -> Expression[bool]: ...
+
+        @overload
+        def __call__(
+            self: DatabaseExpressionBuilder[Literal["toy"], ToyColumns],
+            column: Literal["id", "name"],
             operator: Literal["is", "is not"],
             value: None,
         ) -> Expression[bool]: ...
@@ -417,279 +537,6 @@ if TYPE_CHECKING:
             self: DatabaseExpressionBuilder[TablesT | Literal["toy"], ColumnT],
             column: Literal[
                 "toy.id", "toy.pet_id", "pet_id", "toy.name", "toy.price", "price"
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> Expression[bool]: ...
-
-        def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
-            return super().__call__(column, operator, value)
-
-    class PersonExpressionBuilder(ExpressionBuilder[PersonColumns]):
-        @overload
-        def __call__(
-            self,
-            column: Literal["person.id", "id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["person.id", "id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["person.status", "status"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: Literal["active", "inactive"],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["person.status", "status"],
-            operator: Literal["in", "not in"],
-            value: list[Literal["active", "inactive"]]
-            | tuple[Literal["active", "inactive"], ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["person.status", "status"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal[
-                "person.id",
-                "id",
-                "person.first_name",
-                "first_name",
-                "person.last_name",
-                "last_name",
-                "person.status",
-                "status",
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> Expression[bool]: ...
-
-        def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
-            return super().__call__(column, operator, value)
-
-    class PetExpressionBuilder(ExpressionBuilder[PetColumns]):
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.name", "name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.name", "name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.name", "name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.species", "species"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: Literal["cat", "dog", "hamster"],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.species", "species"],
-            operator: Literal["in", "not in"],
-            value: list[Literal["cat", "dog", "hamster"]]
-            | tuple[Literal["cat", "dog", "hamster"], ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.species", "species"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.born", "born"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: date,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["pet.born", "born"],
-            operator: Literal["in", "not in"],
-            value: list[date] | tuple[date, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal[
-                "pet.id",
-                "id",
-                "pet.owner_id",
-                "owner_id",
-                "pet.name",
-                "name",
-                "pet.species",
-                "species",
-                "pet.born",
-                "born",
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> Expression[bool]: ...
-
-        def __call__(self, column: Any, operator: Any, value: Any) -> Expression[bool]:
-            return super().__call__(column, operator, value)
-
-    class ToyExpressionBuilder(ExpressionBuilder[ToyColumns]):
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.name", "name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.name", "name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.name", "name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.price", "price"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: float,
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal["toy.price", "price"],
-            operator: Literal["in", "not in"],
-            value: list[float] | tuple[float, ...],
-        ) -> Expression[bool]: ...
-
-        @overload
-        def __call__(
-            self,
-            column: Literal[
-                "toy.id",
-                "id",
-                "toy.pet_id",
-                "pet_id",
-                "toy.name",
-                "name",
-                "toy.price",
-                "price",
             ],
             operator: Literal["is", "is not"],
             value: None,
@@ -1877,379 +1724,13 @@ if TYPE_CHECKING:
                 return super().where(name, operator, value)
             return super().where(column)
 
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["person.id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["person.id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["person.status", "status"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: Literal["active", "inactive"],
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["person.status", "status"],
-            operator: Literal["in", "not in"],
-            value: list[Literal["active", "inactive"]]
-            | tuple[Literal["active", "inactive"], ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["person.status", "status"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal[
-                "person.id",
-                "person.first_name",
-                "first_name",
-                "person.last_name",
-                "last_name",
-                "person.status",
-                "status",
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> DatabaseQuery[
-            TablesT | Literal["person"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.id", "pet.owner_id", "owner_id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.id", "pet.owner_id", "owner_id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.species", "species"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: Literal["cat", "dog", "hamster"],
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.species", "species"],
-            operator: Literal["in", "not in"],
-            value: list[Literal["cat", "dog", "hamster"]]
-            | tuple[Literal["cat", "dog", "hamster"], ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.species", "species"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.born", "born"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: date,
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["pet.born", "born"],
-            operator: Literal["in", "not in"],
-            value: list[date] | tuple[date, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal[
-                "pet.id",
-                "pet.owner_id",
-                "owner_id",
-                "pet.name",
-                "pet.species",
-                "species",
-                "pet.born",
-                "born",
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> DatabaseQuery[
-            TablesT | Literal["pet"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.id", "toy.pet_id", "pet_id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.id", "toy.pet_id", "pet_id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.price", "price"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: float,
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal["toy.price", "price"],
-            operator: Literal["in", "not in"],
-            value: list[float] | tuple[float, ...],
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
-        def having(
-            self: DatabaseQuery[
-                TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-            ],
-            column: Literal[
-                "toy.id", "toy.pet_id", "pet_id", "toy.name", "toy.price", "price"
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> DatabaseQuery[
-            TablesT | Literal["toy"], ColumnT, NullT, FieldsT, StarT
-        ]: ...
-
-        @overload
         def having(
             self,
             column: Callable[
                 [DatabaseExpressionBuilder[TablesT, ColumnT]], Expression[bool]
             ],
-        ) -> DatabaseQuery[TablesT, ColumnT, NullT, FieldsT, StarT]: ...
-
-        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
-            return self._having(column, operator, value)
+        ) -> DatabaseQuery[TablesT, ColumnT, NullT, FieldsT, StarT]:
+            return self._having(cast(Any, column))
 
         @overload
         def order_by(
@@ -2964,7 +2445,11 @@ if TYPE_CHECKING:
 
         @overload
         def where(
-            self, column: Callable[[PersonExpressionBuilder], Expression[bool]]
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[Literal["person"], PersonColumns]],
+                Expression[bool],
+            ],
         ) -> PersonQuery[FieldsT]: ...
 
         def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
@@ -2973,101 +2458,14 @@ if TYPE_CHECKING:
                 return super().where(name, operator, value)
             return super().where(column)
 
-        @overload
         def having(
-            self: PersonQuery[FieldsT],
-            column: Literal["person.id", "id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal["person.id", "id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[Literal["person"], PersonColumns]],
+                Expression[bool],
             ],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal[
-                "person.first_name", "first_name", "person.last_name", "last_name"
-            ],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal["person.status", "status"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: Literal["active", "inactive"],
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal["person.status", "status"],
-            operator: Literal["in", "not in"],
-            value: list[Literal["active", "inactive"]]
-            | tuple[Literal["active", "inactive"], ...],
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal["person.status", "status"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PersonQuery[FieldsT],
-            column: Literal[
-                "person.id",
-                "id",
-                "person.first_name",
-                "first_name",
-                "person.last_name",
-                "last_name",
-                "person.status",
-                "status",
-            ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> PersonQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self, column: Callable[[PersonExpressionBuilder], Expression[bool]]
-        ) -> PersonQuery[FieldsT]: ...
-
-        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
-            return self._having(column, operator, value)
+        ) -> PersonQuery[FieldsT]:
+            return self._having(cast(Any, column))
 
         @overload
         def order_by(
@@ -3408,7 +2806,11 @@ if TYPE_CHECKING:
 
         @overload
         def where(
-            self, column: Callable[[PetExpressionBuilder], Expression[bool]]
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[Literal["pet"], PetColumns]],
+                Expression[bool],
+            ],
         ) -> PetQuery[FieldsT]: ...
 
         def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
@@ -3417,113 +2819,14 @@ if TYPE_CHECKING:
                 return super().where(name, operator, value)
             return super().where(column)
 
-        @overload
         def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.id", "id", "pet.owner_id", "owner_id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.name", "name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.name", "name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.name", "name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.species", "species"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: Literal["cat", "dog", "hamster"],
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.species", "species"],
-            operator: Literal["in", "not in"],
-            value: list[Literal["cat", "dog", "hamster"]]
-            | tuple[Literal["cat", "dog", "hamster"], ...],
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.species", "species"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.born", "born"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: date,
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal["pet.born", "born"],
-            operator: Literal["in", "not in"],
-            value: list[date] | tuple[date, ...],
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: PetQuery[FieldsT],
-            column: Literal[
-                "pet.id",
-                "id",
-                "pet.owner_id",
-                "owner_id",
-                "pet.name",
-                "name",
-                "pet.species",
-                "species",
-                "pet.born",
-                "born",
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[Literal["pet"], PetColumns]],
+                Expression[bool],
             ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> PetQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self, column: Callable[[PetExpressionBuilder], Expression[bool]]
-        ) -> PetQuery[FieldsT]: ...
-
-        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
-            return self._having(column, operator, value)
+        ) -> PetQuery[FieldsT]:
+            return self._having(cast(Any, column))
 
         @overload
         def order_by(
@@ -3823,7 +3126,11 @@ if TYPE_CHECKING:
 
         @overload
         def where(
-            self, column: Callable[[ToyExpressionBuilder], Expression[bool]]
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[Literal["toy"], ToyColumns]],
+                Expression[bool],
+            ],
         ) -> ToyQuery[FieldsT]: ...
 
         def where(self, column: Any, operator: Any = None, value: Any = None) -> Any:
@@ -3832,86 +3139,14 @@ if TYPE_CHECKING:
                 return super().where(name, operator, value)
             return super().where(column)
 
-        @overload
         def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: int,
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.id", "id", "toy.pet_id", "pet_id"],
-            operator: Literal["in", "not in"],
-            value: list[int] | tuple[int, ...],
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.name", "name"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: str,
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.name", "name"],
-            operator: Literal["in", "not in"],
-            value: list[str] | tuple[str, ...],
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.name", "name"],
-            operator: Literal["like", "not like"],
-            value: str,
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.price", "price"],
-            operator: Literal["=", "!=", "<>", "<", "<=", ">", ">="],
-            value: float,
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal["toy.price", "price"],
-            operator: Literal["in", "not in"],
-            value: list[float] | tuple[float, ...],
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self: ToyQuery[FieldsT],
-            column: Literal[
-                "toy.id",
-                "id",
-                "toy.pet_id",
-                "pet_id",
-                "toy.name",
-                "name",
-                "toy.price",
-                "price",
+            self,
+            column: Callable[
+                [DatabaseExpressionBuilder[Literal["toy"], ToyColumns]],
+                Expression[bool],
             ],
-            operator: Literal["is", "is not"],
-            value: None,
-        ) -> ToyQuery[FieldsT]: ...
-
-        @overload
-        def having(
-            self, column: Callable[[ToyExpressionBuilder], Expression[bool]]
-        ) -> ToyQuery[FieldsT]: ...
-
-        def having(self, column: Any, operator: Any = None, value: Any = None) -> Any:
-            return self._having(column, operator, value)
+        ) -> ToyQuery[FieldsT]:
+            return self._having(cast(Any, column))
 
         @overload
         def order_by(
@@ -4093,9 +3328,9 @@ if TYPE_CHECKING:
         def select_from(self, table: Literal["toy"]) -> ToyQuery[Nil]: ...
 
         def select_from(self, table: str) -> Any:
-            query_class, builder = _QUERIES[table]
-            query = super().select_from(table).typed(builder)
-            return query_class(cast(Any, query))
+            query = super().select_from(table)
+            typed = query.typed(DatabaseExpressionBuilder)
+            return _QUERIES[table](cast(Any, typed))
 
 else:
     # Runtime twins of the typed classes: no overloads, so importing
@@ -4107,8 +3342,8 @@ else:
         def select_as(self, source, alias):
             return self._select_as(source, alias)
 
-        def having(self, column, operator=None, value=None):
-            return self._having(column, operator, value)
+        def having(self, column):
+            return self._having(column)
 
         def order_by(self, column, direction="asc"):
             return self._order_by(column, direction)
@@ -4129,8 +3364,8 @@ else:
         def select_as(self, source, alias):
             return self._select_as(source, alias)
 
-        def having(self, column, operator=None, value=None):
-            return self._having(column, operator, value)
+        def having(self, column):
+            return self._having(column)
 
         def order_by(self, column, direction="asc"):
             return self._order_by(column, direction)
@@ -4151,19 +3386,10 @@ else:
             query = self._query.join("full", table, left, right)
             return DatabaseQuery(query.typed(DatabaseExpressionBuilder))
 
-    class PersonExpressionBuilder(ExpressionBuilder):
-        pass
-
     class PersonQuery(SingleTableQuery):
         pass
 
-    class PetExpressionBuilder(ExpressionBuilder):
-        pass
-
     class PetQuery(SingleTableQuery):
-        pass
-
-    class ToyExpressionBuilder(ExpressionBuilder):
         pass
 
     class ToyQuery(SingleTableQuery):
@@ -4171,16 +3397,16 @@ else:
 
     class DatabaseClient(Pysely):
         def select_from(self, table):
-            query_class, builder = _QUERIES[table]
-            query = super().select_from(table).typed(builder)
-            return query_class(query)
+            query = super().select_from(table)
+            typed = query.typed(DatabaseExpressionBuilder)
+            return _QUERIES[table](typed)
 
 
-# The query and expression-builder classes behind each table name.
-_QUERIES: dict[str, tuple[type[Any], type[Any]]] = {
-    "person": (PersonQuery, PersonExpressionBuilder),
-    "pet": (PetQuery, PetExpressionBuilder),
-    "toy": (ToyQuery, ToyExpressionBuilder),
+# The single-table query class behind each table name.
+_QUERIES: dict[str, type[Any]] = {
+    "person": PersonQuery,
+    "pet": PetQuery,
+    "toy": ToyQuery,
 }
 
 

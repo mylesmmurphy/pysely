@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 import sys
 import textwrap
@@ -341,6 +342,26 @@ def test_schema_may_be_named_database() -> None:
     generated = generate(SCHEMA.replace("class DatabaseSchema:", "class Database:"))
     assert "class Database(GeneratedSchema[DatabaseClient]):" in generated
     assert "schema = Database" in generated
+
+
+def test_generated_module_is_well_typed_without_its_pragma(tmp_path: Path) -> None:
+    """`# mypy: ignore-errors` skips mypy's quadratic overlap check for users;
+    the generator's own output must still pass mypy strict with it removed."""
+    generated = generate(SCHEMA).replace(
+        "# mypy: ignore-errors\n",
+        '# mypy: disable-error-code="override, overload-overlap"\n',
+    )
+    assert "# mypy: ignore-errors" not in generated
+    target = tmp_path / "schema.py"
+    target.write_text(generated)
+    result = subprocess.run(
+        [sys.executable, "-m", "mypy", "--strict", str(target)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        env={**os.environ, "MYPYPATH": str(ROOT / "src")},
+    )
+    assert result.returncode == 0, result.stdout
 
 
 def test_heavy_overloads_live_only_under_type_checking() -> None:
