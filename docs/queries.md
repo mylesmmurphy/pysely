@@ -94,7 +94,7 @@ query = (
     .select("status")
     .select_as("person.id", "pid")
     .group_by("status")
-    .having("status", "!=", "inactive")
+    .having(lambda eb: eb("status", "!=", "inactive"))
     .order_by("pid", "desc")
     .limit(10)
     .offset(20)
@@ -107,7 +107,7 @@ names = (
 ```
 
 - `order_by` accepts a column in scope or the alias of a selected field.
-- `having` takes the same arguments as `where`.
+- `having` takes a callback with the same operator shapes as `where`.
 - `union`, `union_all`, `intersect` and `except_` require the other query to
   select the same keys with the same types.
 - SQL Server pages with `offset ... fetch`, which requires `order_by`.

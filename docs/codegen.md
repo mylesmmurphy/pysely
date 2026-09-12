@@ -98,10 +98,30 @@ only see `Literal["species"]` if that literal exists in a real annotation.
 Pyright has no plugin interface, so writing the file is the only option that
 works in every editor.
 
-## Not yet
+## From a live database
 
-`pysely introspect` — writing `tables.py` straight from a live database — is
-planned.
+```bash
+pysely introspect --dialect postgres --url postgresql://app@localhost/app -o tables.py
+pysely codegen tables.py --output schema.py
+```
+
+`introspect` reads the catalog (SQLite file path, PostgreSQL DSN with
+`--schema`, or `mysql://user:pass@host:port` with `--schema` as the
+database) and writes the same `tables.py` you would write by hand, then
+stops: connection details never reach the output. Nullability becomes
+`X | None`; enum columns become `Literal[...]`; defaults, generated columns,
+primary and foreign keys are recorded as comments. A SQL type with no Python
+mapping fails the run; pass `--override table.column=Type` for it, or
+`--unknown object` to accept `object`. Edit the file freely afterwards.
+
+## Limits
+
+- Pyright stops analysing a module above roughly 15,000 method definitions;
+  `codegen` fails near that point (about 80 tables of 17 columns). Split
+  large databases into several database classes, one generated module each.
+- The generated module carries `# mypy: ignore-errors`, because mypy's
+  overload-overlap check is quadratic in the overload count. Your own code is
+  still checked; the generator's output is checked in Pysely's CI.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

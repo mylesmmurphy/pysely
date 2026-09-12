@@ -51,7 +51,7 @@ Each line below is covered by a test that runs stock mypy 1.20 and Pyright
 | --- | --- |
 | Table and column completion, in scope only | Verified |
 | Unknown, unjoined or ambiguous columns in `select`, `select_as`, `where`, `where_ref`, `group_by`, `having`, `order_by`, joins and callbacks | Error |
-| `where`/`having` values checked per operator family (see below) | Verified |
+| `where` values checked per operator family (see below); `having` takes the callback form | Verified |
 | Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | Verified for the first 16 fields |
 | `select_as` alias typed as a key; `order_by` accepts selected aliases | Verified for a literal alias (aliases: first 8 fields) |
 | Left join: the joined table's keys become `X \| None` | Verified |
@@ -135,8 +135,13 @@ Each has a reproducer in `test/typings`.
 ## Performance
 
 Measured with `scripts/benchmark_typing.py` on synthetic schemas (10-30
-columns per table, six shared column names). See the numbers in
-[ADR 0006](adr/0006-generated-typed-interfaces.md).
+columns per table, six shared column names); full table in
+[ADR 0006](adr/0006-generated-typed-interfaces.md). In short: Pyright
+re-evaluates every reachable class on each edit, so completion latency grows
+with the generated module. Single-table completions stay under 300 ms up to
+about 20 tables and reach 1.5 s at 60; joined-query completions are 1.9 s at
+20 tables. Pyright refuses modules past roughly 80 tables; split larger
+databases into several database classes.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

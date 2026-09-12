@@ -61,18 +61,39 @@ drift with nothing enforcing agreement.
 
 macOS 14.6 x86_64, Python 3.11.4, Pyright 1.1.413, mypy 1.20.2. Synthetic
 schemas: 10-30 columns per table, six column names shared by every table.
-`scripts/benchmark_typing.py`.
+`scripts/benchmark_typing.py --tables 20 60 --rounds 10`. The 20-table row
+ran while other processes were still winding down; its generation and cold
+checker times are inflated, the completion figures are not.
 
-| Tables | Columns | Generated | Overloads | Pyright warm CLI | single-table `select("` p95 | joined `select("` p95 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 20 | 333 | 1.2 MB | 3.1k | 3.1 s | 176 ms | 1.25 s |
+| Tables | Columns | Generated | Definitions | Pyright warm CLI | mypy cold / warm | `select("` p95 single-table | `select("` p95 joined (2 / 3 tables) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20 | 333 | 1.3 MB | 3.3k | 3.1 s | 224 s* / 0.3 s | 294 ms | 1.9 s / 2.8 s |
+| 60 | 1020 | 4.0 MB | 10.0k | 11.8 s | 607 s / 0.4 s | 1.47 s | 8.2 s / 9.5 s |
+| 100 | 1693 | — | 17.2k | codegen refuses: over Pyright's module ceiling | | | |
 
-Pyright's completion cost is roughly linear in the number of overloads on the
-called method (about 0.4-2 ms each) and superlinear past a few thousand.
-Per-table classes keep single-table queries within the 300 ms target at any
-schema size; joined queries evaluate every column's overloads and scale with
-the schema. That is the accepted budget; a joined-query fast path would need
-one class per table pair.
+\* 13.6 s on an idle machine.
+
+What the numbers mean:
+
+- **Pyright discards its type cache on every edit**, so each completion
+  re-evaluates every class reachable from the symbols in the statement. From
+  `db.select_from(...)` that is every table class plus the joined class, about
+  0.1-0.15 ms per definition. The 300 ms target therefore holds up to roughly
+  2,000 definitions, about 15-20 tables of 17 columns; at 60 tables a
+  single-table completion takes 1.5 s. Joined-query completions add a scan of
+  the joined class's `select` overloads (two per column).
+- **Pyright stops analysing a module above about 15,000 definitions** (its
+  code-flow complexity limit); `codegen` fails near that point.
+- **mypy's overload-overlap check is quadratic** (56 s at 20 tables); the
+  generated module carries `# mypy: ignore-errors`, which is the one switch
+  that skips it. Cold mypy is still slow on large modules; the warm
+  incremental run is fast.
+- **mypy row lookups** cost about 2 s each at 16 selected fields.
+
+Rejected mitigations: one class per joined table pair (N² classes); putting
+the joined overloads on a per-table base (still evaluated per edit); table
+tokens in the cons cell (mypy). The accepted budget is above; larger
+databases should be split into several database classes, one module each.
 
 ## Consequences
 
