@@ -15,11 +15,36 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Protocol, cast
 
 from pysely.codegen import SchemaError
+
+Record = Mapping[str, Any]
+"""A catalog row from a driver; drivers are untyped, so values are ``Any``."""
+
+
+class _PostgresConnection(Protocol):
+    async def fetch(self, query: str, *args: object) -> Sequence[Record]: ...
+
+    async def close(self) -> None: ...
+
+
+class _MysqlCursor(Protocol):
+    async def execute(self, query: str, args: object = None) -> object: ...
+
+    async def fetchall(self) -> Sequence[Sequence[Any]]: ...
+
+    async def __aenter__(self) -> _MysqlCursor: ...
+
+    async def __aexit__(self, *exc_info: object) -> None: ...
+
+
+class _MysqlConnection(Protocol):
+    def cursor(self) -> _MysqlCursor: ...
+
+    async def ensure_closed(self) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,7 +348,11 @@ async def introspect_postgres(
 ) -> list[IntrospectedTable]:
     import asyncpg  # type: ignore[import-not-found]  # optional driver
 
-    connection = await asyncpg.connect(dsn)
+    connect = cast(
+        Callable[[str], Awaitable[_PostgresConnection]],
+        asyncpg.connect,  # pyright: ignore[reportUnknownMemberType]
+    )
+    connection = await connect(dsn)
     try:
         rows = await connection.fetch(
             """
@@ -404,7 +433,11 @@ async def introspect_postgres(
 async def introspect_mysql(database: str, **connect: Any) -> list[IntrospectedTable]:
     import asyncmy  # type: ignore[import-not-found]  # optional driver
 
-    connection = await asyncmy.connect(db=database, **connect)
+    open_connection = cast(
+        Callable[..., Awaitable[_MysqlConnection]],
+        asyncmy.connect,  # pyright: ignore[reportUnknownMemberType]
+    )
+    connection = await open_connection(db=database, **connect)
     try:
         async with connection.cursor() as cursor:
             await cursor.execute(

@@ -119,6 +119,12 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         """Return :class:`Row` results and use a generated expression builder."""
         return replace(self, _builder_type=builder_type)
 
+    def _builder(self, scope: dict[str, str]) -> ExpressionBuilder[Any]:
+        builder_type: type[ExpressionBuilder[Any]] = (
+            self._builder_type or ExpressionBuilder
+        )
+        return builder_type(self._schema, scope)
+
     def select(
         self, selections: str | Sequence[str]
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
@@ -143,8 +149,7 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         value: object = None,
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
         if callable(column):
-            builder_type = self._builder_type or ExpressionBuilder
-            predicate = column(builder_type(self._schema, self._scope)).node
+            predicate = column(self._builder(self._scope)).node
         else:
             if operator is None:
                 raise TypeError("where() requires an operator and value")
@@ -183,8 +188,7 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         value: object = None,
     ) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
         if callable(column):
-            builder_type = self._builder_type or ExpressionBuilder
-            predicate = column(builder_type(self._schema, self._scope)).node
+            predicate = column(self._builder(self._scope)).node
         else:
             if operator is None:
                 raise TypeError("having() requires an operator and value")
@@ -208,12 +212,12 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         )
 
     def limit(self, count: int) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
-        if not isinstance(count, int) or count < 0:
+        if count < 0:
             raise InvalidQueryError("limit() takes a non-negative integer")
         return replace(self, _node=replace(self._node, limit=count))
 
     def offset(self, count: int) -> SchemaQueryBuilder[DatabaseT, ScopeT, RowT]:
-        if not isinstance(count, int) or count < 0:
+        if count < 0:
             raise InvalidQueryError("offset() takes a non-negative integer")
         return replace(self, _node=replace(self._node, offset=count))
 

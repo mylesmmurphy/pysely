@@ -387,26 +387,6 @@ def _signature(
     return lines
 
 
-def _class_header(name: str, bases: list[TypeExpr], indent: int) -> list[str]:
-    """Render ``class Name(bases):`` the way ruff format would."""
-    pad = " " * indent
-    joined = ", ".join(_one_line(base) for base in bases)
-    single = f"{pad}class {name}({joined}):"
-    if len(single) <= LINE_LENGTH:
-        return [single]
-    inner = " " * (indent + 4)
-    if len(inner) + len(joined) <= LINE_LENGTH:
-        return [f"{pad}class {name}(", f"{inner}{joined}", f"{pad}):"]
-    lines = [f"{pad}class {name}("]
-    for base in bases:
-        rendered = _render_type(base, indent + 4, first=len(inner), last=1)
-        rendered[-1] += ","
-        lines.append(f"{inner}{rendered[0]}")
-        lines.extend(rendered[1:])
-    lines.append(f"{pad}):")
-    return lines
-
-
 def _import_order(name: str) -> tuple[int, str]:
     """isort's default order-by-type: CONSTANTS, then Classes, then functions."""
     if name.isupper():

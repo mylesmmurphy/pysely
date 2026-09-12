@@ -3,7 +3,16 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generic, TypeVar, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    ClassVar,
+    Generic,
+    TypeVar,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from pysely.errors import InvalidQueryError
 from pysely.operation_node import (
@@ -142,7 +151,8 @@ class Schema:
                 value, Sequence | AbstractSet
             ):
                 raise InvalidQueryError(f"{operator!r} requires a list or tuple")
-            return BinaryOperationNode(reference, operator, ValueListNode(tuple(value)))
+            values = tuple(cast(Sequence[object], value))
+            return BinaryOperationNode(reference, operator, ValueListNode(values))
         if operator in COMPARISON_OPERATORS or operator in PATTERN_OPERATORS:
             if value is None:
                 raise InvalidQueryError(

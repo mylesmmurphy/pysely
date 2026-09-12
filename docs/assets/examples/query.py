@@ -24,4 +24,4 @@ async def run_query() -> None:
     row["id"]  # hover: int
     row["first_name"]  # hover: str
     row["pet_name"]  # hover: str | None (left join)
-    row["missing"]  # error: not selected
+    # row["missing"] is an error: it was not selected.
