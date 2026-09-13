@@ -1,8 +1,8 @@
 # Typed SQL for Python
 
-Pysely is an async-first SQL query builder inspired by
-[Kysely](https://kysely.dev). It combines immutable queries, explicit database
-types, and parameterized SQL without hiding the SQL you write.
+Write SQL-shaped queries in Python, with editor checks for column names,
+filter values, and selected result types. Pysely is async-first and inspired by
+[Kysely](https://kysely.dev).
 
 !!! warning "Early development"
 
@@ -19,10 +19,20 @@ rows = await (
 )
 ```
 
-`pysely typgen dbschema.py` generates only `dbschema.pyi`, which mypy and Pyright
-read without a plugin. **No massive runtime file is generated.** Python runs your
-handwritten schema and the shared library; it never loads the stub. See
-[Type generation](typgen.md).
+## Types without generated runtime code
+
+Write your schema in `dbschema.py`. Run `pysely typgen dbschema.py` to generate
+`dbschema.pyi` for mypy and Pyright.
+
+Python never loads the stub. Your app uses the handwritten schema and shared
+library code—no massive generated runtime file and no checker plugin.
+
+## Pick a starting point
+
+- [Run your first query](getting-started.md) with a complete SQLite example.
+- [Browse the query APIs](queries.md) for joins, filters, and transactions.
+- [Understand typing](typing.md) and its current limits.
+- [Try the playground](playground.md) without installing anything.
 
 ## Current database support
 

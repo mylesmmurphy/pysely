@@ -1,0 +1,18 @@
+from typing import Generic, Literal, TypeVar, assert_type
+
+C = TypeVar("C", bound=str)
+K = TypeVar("K", bound=Literal["a.name", "b.name", "c.name"])
+
+class Scope(Generic[C]):
+    pass
+
+class Query(Scope[C]):
+    def select(self: Scope[C | K], key: K) -> str | None:
+        return None
+
+def check(a: Query[Literal["a.name"]], ab: Query[Literal["a.name", "b.name"]]) -> None:
+    assert_type(a.select("a.name"), str | None)
+    assert_type(ab.select("b.name"), str | None)
+    a.select("b.name")  # error
+    ab.select("c.name")  # error
+    ab.select("a.missing")  # error

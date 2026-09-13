@@ -1,8 +1,13 @@
 # ADR 0001: Immutable operation tree
 
-Status: accepted
+Status: accepted.
 
-Query builders hold frozen, slotted dataclasses and tuple children. Each builder
-method returns a new builder and structurally shares unchanged nodes. Values remain
-opaque references and callers must not mutate them during execution.
+## Decision
 
+Query builders hold frozen, slotted dataclasses with tuple children.
+Each builder call returns a new builder and shares unchanged nodes.
+
+## Caller responsibility
+
+Bound values remain references to caller-owned objects.
+Do not mutate them during execution.

@@ -1,12 +1,22 @@
 # ADR 0005: User-provided database resources
 
-Status: accepted
+Status: accepted.
 
-PostgreSQL and MySQL dialects accept a pool or an async pool factory. The SQLite
-dialect accepts a database connection or an async database factory. Dialects do
-not accept connection settings or create these resources themselves.
+## Resource inputs
 
-Pysely closes its configured pool or database when destroyed, matching Kysely's
-lifecycle. MySQL and SQLite resources must enable autocommit so root writes do not
-leave implicit transactions open; explicit transactions still issue begin, commit,
-and rollback.
+| Dialect | Accepts |
+| --- | --- |
+| PostgreSQL / MySQL | A pool or async pool factory |
+| SQLite | A connection or async connection factory |
+
+Dialects do not accept connection settings or create resources themselves.
+
+## Ownership
+
+Pysely closes the configured pool or connection when the client is destroyed.
+Applications must account for that ownership when sharing resources.
+
+## Transactions
+
+MySQL and SQLite resources must enable autocommit for root-level writes.
+Explicit Pysely transactions still issue begin, commit, and rollback.

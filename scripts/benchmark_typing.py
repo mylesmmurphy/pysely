@@ -5,7 +5,7 @@ generates them with the real generator, and records generated size,
 generation time, cold and warm checker time, Pyright RSS, and warm completion
 latency from the stock Pyright language server.
 
-    uv run python scripts/benchmark_typing.py --tables 20 100 300
+    uv run python scripts/benchmark_typing.py --tables 20 60 100
 """
 
 from __future__ import annotations

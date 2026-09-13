@@ -1,19 +1,23 @@
 # Dialects
 
-Install only the driver needed by the application.
+A dialect chooses SQL syntax and connects Pysely to a database driver.
+You provide the connection or pool; Pysely does not accept a URL directly.
+
+Choose a database below. The install commands use `main`, matching these docs.
+Run connection setup containing `await` inside your application's async startup.
 
 === "PostgreSQL"
 
     === "uv"
 
         ```bash
-        uv add --prerelease allow "pysely[postgres]"
+        uv add "pysely[postgres] @ git+https://github.com/mylesmmurphy/pysely.git@main"
         ```
 
     === "pip"
 
         ```bash
-        pip install --pre "pysely[postgres]"
+        pip install "pysely[postgres] @ git+https://github.com/mylesmmurphy/pysely.git@main"
         ```
 
     ```python
@@ -26,8 +30,7 @@ Install only the driver needed by the application.
     dialect = PostgresDialect(pool=pool)
     ```
 
-    Pysely acquires connections from the provided pool and closes the pool when
-    `db.destroy()` runs.
+    Pysely acquires a pool connection for each query or connection scope.
 
     A factory can initialize the pool lazily:
 
@@ -44,13 +47,13 @@ Install only the driver needed by the application.
     === "uv"
 
         ```bash
-        uv add --prerelease allow "pysely[mysql]"
+        uv add "pysely[mysql] @ git+https://github.com/mylesmmurphy/pysely.git@main"
         ```
 
     === "pip"
 
         ```bash
-        pip install --pre "pysely[mysql]"
+        pip install "pysely[mysql] @ git+https://github.com/mylesmmurphy/pysely.git@main"
         ```
 
     ```python
@@ -69,21 +72,20 @@ Install only the driver needed by the application.
     dialect = MysqlDialect(pool=pool)
     ```
 
-    MySQL pools must have autocommit enabled. Pysely closes the pool when
-    `db.destroy()` runs.
+    Keep `autocommit=True`. Explicit Pysely transactions still commit or roll back as a unit.
 
 === "SQLite"
 
     === "uv"
 
         ```bash
-        uv add --prerelease allow "pysely[sqlite]"
+        uv add "pysely[sqlite] @ git+https://github.com/mylesmmurphy/pysely.git@main"
         ```
 
     === "pip"
 
         ```bash
-        pip install --pre "pysely[sqlite]"
+        pip install "pysely[sqlite] @ git+https://github.com/mylesmmurphy/pysely.git@main"
         ```
 
     ```python
@@ -96,8 +98,33 @@ Install only the driver needed by the application.
     dialect = SqliteDialect(database=database)
     ```
 
-    SQLite databases must use autocommit. Use `async with` or call
-    `await db.destroy()` to close the database.
+    `isolation_level=None` enables autocommit. Use `":memory:"` instead of `"app.db"`
+    for a temporary database.
+
+## Create and close the client
+
+Use the `dialect` from the selected tab:
+
+```python
+from dbschema import DatabaseSchema
+
+async with DatabaseSchema.connect(dialect=dialect) as db:
+    rows = await db.select_from("person").select("id").execute()
+```
+
+For a long-lived client, create it at startup and call `await db.destroy()` at shutdown.
+
+Pysely closes the configured pool or connection. Do not give it a resource that
+another part of your application must keep using after the client is destroyed.
+
+## Database differences
+
+| Database | Driver | Important boundary |
+| --- | --- | --- |
+| PostgreSQL | `asyncpg` | Connection pools supported |
+| MySQL | `asyncmy` | No full join or `returning()` through this API |
+| SQLite | `aiosqlite` | One configured connection |
+| SQL Server / PGlite | No runtime adapter yet | Offline compilation only |
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

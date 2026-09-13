@@ -1,104 +1,160 @@
 # Queries
 
-## Select
+Start with a client from `DatabaseSchema.connect(dialect=dialect)`.
+These examples use the [playground's person and pet schema](assets/examples/schema.py).
+
+Run examples containing `await` inside an async function. Database tables must already exist.
+
+## Select columns
 
 ```python
 query = (
     db.select_from("person")
-    .inner_join("pet", "owner_id", "person.id")
+    .select("id")
     .select("first_name")
-    .select_as("pet.name", "pet_name")
-    .where("species", "=", "dog")
+    .where("first_name", "=", "Ada")
 )
-
-compiled = query.compile()
-rows = await query.execute()
 ```
 
-- `execute_take_first()` returns zero or one row.
-- `execute_take_first_or_throw()` raises when no row exists.
-- Pass `schema=Database` for schema-aware string queries.
-- Qualify ambiguous columns with their table or alias.
+Use one `.select()` per column to keep exact result keys and types.
+Building a query does not execute it.
 
-### Portable typed aliases
+| Finish with | Result |
+| --- | --- |
+| `query.compile()` | SQL and parameters; no connection needed |
+| `await query.execute()` | A list of rows, possibly empty |
+| `await query.execute_take_first()` | A row or `None` |
+| `await query.execute_take_first_or_throw()` | A row, or `NoResultError` |
 
-Use `.select_as(source, alias)` when the result key should be inferred by standard
-Python type checkers:
+Use `.limit(1)` if the database should fetch at most one row.
+
+```python
+compiled = query.compile()
+print(compiled.sql)
+print(compiled.parameters)
+```
+
+Values are sent separately from SQL. Do not interpolate user input into SQL strings.
+
+## Rename a result key
 
 ```python
 row = await (
     db.select_from("pet")
-    .select_as("pet.name", "pet_name")
+    .select_as("name", "pet_name")
     .execute_take_first_or_throw()
 )
-name = row["pet_name"]
+name = row["pet_name"]  # str
 ```
 
-Pysely separates these arguments because Python typing cannot split an arbitrary
-`"pet.name as pet_name"` string into a source type and a new result key. The
-single-string form remains supported at runtime, but exact portable result-key
-inference is not promised for it. Direct literal aliases retain completion and
-value information; dynamic or conflicting aliases use conservative result types.
+Use a literal alias with `select_as`. The string form `"name as pet_name"`
+works at runtime but does not preserve exact static result typing.
 
-## Boolean groups and column references
+Rows are immutable mappings. Call `row.to_dict()` for an ordinary dictionary.
+
+## Filter rows
 
 ```python
 query = (
     db.select_from("person")
-    .inner_join("pet", "person.id", "pet.owner_id")
-    .select("person.id")
+    .select("id")
+    .where("status", "=", "active")
+    .where("first_name", "like", "A%")
+)
+```
+
+Repeated `where` calls are joined with SQL `AND`.
+
+| Operator | Value |
+| --- | --- |
+| `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=` | The column's Python type |
+| `is`, `is not` | `None` |
+| `like`, `not like` | A string pattern, for string columns |
+| `in`, `not in` | A list or tuple of column values |
+
+Use `is` or `is not` to compare with SQL `NULL`.
+
+## Group conditions
+
+`eb` is an expression builder. Call it like `where`, then combine conditions:
+
+```python
+query = (
+    db.select_from("pet")
+    .select("name")
     .where(
-        lambda eb: eb.and_(
-            eb("person.id", "!=", 0),
-            eb.or_(
-                eb("species", "=", "cat"),
-                eb("species", "=", "dog"),
-            ),
-        ),
+        lambda eb: eb.or_(
+            eb("species", "=", "cat"),
+            eb("species", "=", "dog"),
+        )
     )
 )
-
-reference_query = query.where_ref("person.id", "=", "pet.owner_id")
 ```
 
-The expression builder uses the columns in the current query scope, so its string
-arguments receive the same completion and type checking as `.where()`. Use
-`.where_ref()` when both sides of a comparison are columns; `eb.not_()` and
-`eb.ref()` are also available inside a callback.
+Use `eb.and_()`, `eb.or_()`, and `eb.not_()` for nested conditions.
+Callback columns and values receive the same checks as `where`.
 
-Operators take different value shapes: comparisons bind the column's type,
-`is`/`is not` take `None`, `like`/`not like` take a string on string columns,
-and `in`/`not in` take a list or tuple.
-
-## Joins
+## Join tables
 
 ```python
 query = (
     db.select_from("person")
-    .left_join("pet", "pet.owner_id", "person.id")
+    .left_join("pet", "person.id", "pet.owner_id")
+    .select("person.id")
     .select("first_name")
-    .select("pet.name")  # str | None: the pet may be missing
+    .select_as("pet.name", "pet_name")
 )
 ```
 
-`inner_join`, `left_join`, `right_join` and `full_join` take the table and the
-two ON columns. After a left join the joined table's columns read as
-nullable; after a right or full join every column does. MySQL has no full
-join. Rows are immutable mappings; use `row.to_dict()` for a dictionary.
+Each join takes the new table and two columns to compare with `=`.
+Write joins directly in Python; nothing needs to be declared to `typgen`.
 
-## Ordering, paging, grouping and set operations
+- `inner_join`: return matching rows.
+- `left_join`: keep left rows; the joined table's values may be `None`.
+- `right_join` and `full_join`: typing conservatively allows `None` for every field.
+
+MySQL does not support full joins. Qualify shared column names, such as `person.id`.
+
+### Compare two columns
+
+```python
+query = query.where_ref("person.id", "=", "pet.owner_id")
+```
+
+`where` binds a value. `where_ref` compares columns; `eb.ref()` does the same inside a callback.
+
+## Order and page
+
+```python
+query = (
+    db.select_from("person")
+    .select("id")
+    .order_by("id", "asc")
+    .limit(10)
+    .offset(20)
+)
+```
+
+`order_by` accepts a column or selected alias. Use a stable, unique ordering when paging.
+SQL Server requires ordering for `offset ... fetch`.
+
+## Group rows
 
 ```python
 query = (
     db.select_from("person")
     .select("status")
-    .select_as("person.id", "pid")
     .group_by("status")
     .having(lambda eb: eb("status", "!=", "inactive"))
-    .order_by("pid", "desc")
-    .limit(10)
-    .offset(20)
 )
+```
+
+`where` filters before grouping. `having` filters groups and takes a callback.
+Selected non-aggregate columns must appear in `group_by`.
+
+## Combine queries
+
+```python
 names = (
     db.select_from("person")
     .select("first_name")
@@ -106,29 +162,21 @@ names = (
 )
 ```
 
-- `order_by` accepts a column in scope or the alias of a selected field.
-- `having` takes a callback with the same operator shapes as `where`.
-- `union`, `union_all`, `intersect` and `except_` require the other query to
-  select the same keys with the same types.
-- SQL Server pages with `offset ... fetch`, which requires `order_by`.
+Both queries must select matching keys and types in the same order.
+Also available: `union_all`, `intersect`, and `except_`.
 
-## Insert
+## Insert, update, and delete
+
+String-based writes work at runtime. Schema-specific static checking of write
+keys and values is not implemented yet.
 
 ```python
-inserted = await (
+await (
     db.insert_into("person")
-    .values({"first_name": "Ada"})
-    .returning(["id", "first_name"])
-    .execute_take_first_or_throw()
+    .values({"first_name": "Ada", "status": "active"})
+    .execute()
 )
-```
 
-MySQL does not support `returning()` through this API. Non-returning inserts
-provide affected-row and insert-ID metadata.
-
-## Update and delete
-
-```python
 await (
     db.update_table("person")
     .set({"first_name": "Ada"})
@@ -139,24 +187,48 @@ await (
 await db.delete_from("person").where("id", "=", 1).execute()
 ```
 
-## Transactions
+Supply all values required by your database unless it provides defaults.
+An update or delete without `where` affects every row.
+
+### Return inserted values
+
+```python
+inserted = await (
+    db.insert_into("person")
+    .values({"first_name": "Ada", "status": "active"})
+    .returning(["id", "first_name"])
+    .execute_take_first_or_throw()
+)
+```
+
+MySQL does not support `returning()` through this API.
+Without it, writes return affected-row metadata; inserts can also report an insert ID.
+
+## Use a transaction
 
 ```python
 async with db.transaction() as tx:
-    await tx.insert_into("person").values({"first_name": "Ada"}).execute()
+    await (
+        tx.update_table("person")
+        .set({"status": "inactive"})
+        .where("id", "=", 1)
+        .execute()
+    )
+    await tx.delete_from("pet").where("owner_id", "=", 1).execute()
 ```
 
-The transaction commits on normal exit and rolls back when the block raises.
-Use the transaction client inside the block so every query uses the pinned
-connection.
+The block commits on success and rolls back on an exception.
+Use `tx`, not `db`, so both queries share the transaction's connection.
 
-## Single-connection scope
+## Reuse one connection
 
 ```python
 async with db.connection() as connection_db:
     first = await connection_db.select_from("person").select("id").execute()
-    second = await connection_db.select_from("person").select("first_name").execute()
+    second = await connection_db.select_from("pet").select("name").execute()
 ```
+
+This reserves one connection for the block. It does not start a transaction.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

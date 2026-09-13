@@ -23,6 +23,7 @@ jobs:
         run: >-
           uv run pysely typgen docs/assets/examples/schema.py --check
           && uv run pysely typgen test/fixtures/schema.py --check
+          && uv run pysely typgen examples/stubs/dbschema.py --check
       - run: uv run mypy src/pysely test/fixtures/generated.py test/fixtures/schema.py
       - run: MYPYPATH=. uv run mypy --strict test/typings/portable.py test/typings/typed_queries.py
       - run: uv run pyright

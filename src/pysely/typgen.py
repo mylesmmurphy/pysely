@@ -11,11 +11,8 @@ import ast
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TypeAlias
 
 _SINGLE_QUOTED = re.compile(r"'([^'\"\\]*)'")
-
-LINE_LENGTH = 88
 
 # Names the generated module defines itself, so the schema cannot use them.
 RESERVED_NAMES = frozenset(
@@ -258,892 +255,301 @@ def parse_schema(source: str, *, filename: str = "tables.py") -> SchemaModel:
     )
 
 
-# --- rendering helpers ------------------------------------------------------
+# --- direct stub rendering --------------------------------------------------
 
 
-@dataclass(frozen=True, slots=True)
-class Sub:
-    """A subscripted type expression, rendered the way ruff format would."""
-
-    name: str
-    args: tuple[TypeExpr, ...]
-
-
-TypeExpr: TypeAlias = "str | Sub | Union"
-
-
-def _one_line(expr: TypeExpr) -> str:
-    if isinstance(expr, str):
-        return expr
-    if isinstance(expr, Union):
-        return " | ".join(_one_line(item) for item in expr.items)
-    return f"{expr.name}[{', '.join(_one_line(arg) for arg in expr.args)}]"
-
-
-def _render_type(expr: TypeExpr, indent: int, *, first: int, last: int) -> list[str]:
-    """Render a type; ``first``/``last`` are the widths already used around it."""
-    single = _one_line(expr)
-    if isinstance(expr, str) or first + len(single) + last <= LINE_LENGTH:
-        return [single]
-    if isinstance(expr, Union):
-        # ruff splits a long union one member per line, leading with `|`.
-        pad = " " * indent
-        lines = _render_type(expr.items[0], indent, first=first, last=0)
-        for position, item in enumerate(expr.items[1:], start=2):
-            width = last if position == len(expr.items) else 0
-            rendered = _render_type(item, indent, first=indent + 2, last=width)
-            lines.append(f"{pad}| {rendered[0]}")
-            lines.extend(rendered[1:])
-        return lines
-    pad = " " * indent
-    inner = " " * (indent + 4)
-    joined = ", ".join(_one_line(arg) for arg in expr.args)
-    if len(inner) + len(joined) <= LINE_LENGTH:
-        return [f"{expr.name}[", f"{inner}{joined}", f"{pad}]"]
-    lines = [f"{expr.name}["]
-    for arg in expr.args:
-        rendered = _render_type(arg, indent + 4, first=len(inner), last=1)
-        rendered[-1] += ","
-        lines.append(f"{inner}{rendered[0]}")
-        lines.extend(rendered[1:])
-    lines.append(f"{pad}]")
-    return lines
-
-
-def _literal(names: list[str]) -> Sub:
-    return Sub("Literal", tuple(f'"{name}"' for name in names))
-
-
-@dataclass(frozen=True, slots=True)
-class Union:
-    """``a | b | Sub[...]``: only a trailing subscript is ever broken."""
-
-    items: tuple[TypeExpr, ...]
-
-
-def _signature(
-    name: str,
-    parameters: list[tuple[str, TypeExpr | None]],
-    returns: TypeExpr,
-    indent: int = 4,
-    body: str = " ...",
-) -> list[str]:
-    """Render ``def name(params) -> returns:`` the way ruff format would."""
-    pad = " " * indent
-    params = [
-        f"{param}: {_one_line(annotation)}" if annotation is not None else param
-        for param, annotation in parameters
-    ]
-    single = f"{pad}def {name}({', '.join(params)}) -> {_one_line(returns)}:{body}"
-    if len(single) <= LINE_LENGTH:
-        return [single]
-    lines = [f"{pad}def {name}("]
-    inner = " " * (indent + 4)
-    joined = ", ".join(params)
-    if len(inner) + len(joined) <= LINE_LENGTH:
-        lines.append(f"{inner}{joined}")
-    else:
-        for param, annotation in parameters:
-            if annotation is None:
-                lines.append(f"{inner}{param},")
-                continue
-            rendered = _render_type(
-                annotation, indent + 4, first=len(inner) + len(param) + 2, last=1
-            )
-            rendered[-1] += ","
-            lines.append(f"{inner}{param}: {rendered[0]}")
-            lines.extend(rendered[1:])
-    tail = _render_type(returns, indent, first=len(pad) + 5, last=1 + len(body))
-    lines.append(f"{pad}) -> {tail[0]}" + (f":{body}" if len(tail) == 1 else ""))
-    if len(tail) > 1:
-        lines.extend(tail[1:-1])
-        lines.append(f"{tail[-1]}:{body}")
-    return lines
-
-
-def _import_order(name: str) -> tuple[int, str]:
-    """isort's default order-by-type: CONSTANTS, then Classes, then functions."""
-    if name.isupper():
-        return (0, name)
-    if name[:1].isupper():
-        return (1, name)
-    return (2, name)
-
-
-# --- rendering --------------------------------------------------------------
+def _literal(names: list[str]) -> str:
+    return f"Literal[{', '.join(repr(name) for name in names)}]" if names else "Never"
 
 
 class _Renderer:
-    def __init__(self, model: SchemaModel) -> None:
+    """Emit final stub signatures, without runtime twins or a legacy type IR."""
+
+    def __init__(self, model: SchemaModel, values: list[str]) -> None:
         self.model = model
+        self.values = values
+        self.group_vars = [f"G{i}" for i in range(len(values))]
         self.lines: list[str] = []
+        owners: dict[str, int] = {}
+        for table in model.tables:
+            for column in table.columns:
+                owners[column.name] = owners.get(column.name, 0) + 1
+        self.shared = {name for name, count in owners.items() if count > 1}
+        self.group_cache: dict[tuple[str, bool], list[str]] = {}
 
-    # --- helpers
+    def references(
+        self, table: Table, column: Column, *, bare: bool = False
+    ) -> list[str]:
+        names = [f"{table.attribute}.{column.name}"]
+        if bare or column.name not in self.shared:
+            names.append(column.name)
+        return names
 
-    def emit(self, lines: list[str]) -> None:
-        self.lines.extend(lines)
-
-    def overload(
-        self,
-        name: str,
-        parameters: list[tuple[str, TypeExpr | None]],
-        returns: TypeExpr,
-        indent: int = 8,
-    ) -> None:
-        pad = " " * indent
-        self.emit([f"{pad}@overload"])
-        self.emit(_signature(name, parameters, returns, indent))
-        self.emit([""])
-
-    @staticmethod
-    def joined(
-        tables: str, columns: str, null: str, fields: TypeExpr, star: str
-    ) -> Sub:
-        return Sub("DatabaseQuery", (tables, columns, null, fields, star))
-
-    @staticmethod
-    def cons(key: str, value: str, rest: str = "FieldsT") -> Sub:
-        return Sub("Cons", (key, value, rest))
-
-    @staticmethod
-    def fields_pattern(depth: int) -> Sub:
-        """``Cons[K1, V1, Cons[K2, V2, ... RestT]]`` naming every position."""
-        inner: TypeExpr = "RestT"
-        for position in range(depth, 0, -1):
-            inner = Sub("Cons", (f"K{position}", f"V{position}", inner))
-        assert isinstance(inner, Sub)
-        return inner
-
-    def ordering(self, query: Callable[[TypeExpr], Sub], columns: str) -> None:
-        """order_by: a column in scope, or the alias of a selected field."""
-        self.overload(
-            "order_by",
-            [
-                ("self", None),
-                ("column", columns),
-                ('direction: OrderDirection = "asc"', None),
-            ],
-            query("FieldsT"),
-        )
-        for depth in range(1, ORDER_DEPTH + 1):
-            pattern = self.fields_pattern(depth)
-            self.overload(
-                "order_by",
-                [
-                    ("self", query(pattern)),
-                    ("column", f"K{depth}"),
-                    ('direction: OrderDirection = "asc"', None),
-                ],
-                query(pattern),
-            )
-        self.emit(
-            [
-                "        def order_by(self, column: Any, direction: Any = "
-                '"asc") -> Any:',
-                "            return self._order_by(column, direction)",
-                "",
-            ]
-        )
-
-    def having(self, query: Sub, builder: str) -> None:
-        """having: callback form only, to stay under pyright's per-module
-        definition ceiling; the builder carries the typed operator shapes."""
-        self.emit(
-            _signature(
-                "having",
-                [
-                    ("self", None),
-                    (
-                        "column",
-                        Sub("Callable", (Sub("", (builder,)), "Expression[bool]")),
-                    ),
-                ],
-                query,
-                8,
-                body="",
-            )
-        )
-        self.emit(["            return self._having(cast(Any, column))", ""])
-
-    def shapes(
-        self, table: Table, names_for: Callable[[Column], list[str]]
-    ) -> list[tuple[list[str], str, TypeExpr]]:
-        """(column names, operator literal, value type) for each where overload."""
-        by_value: dict[str, list[str]] = {}
-        all_names: list[str] = []
-        for column in table.columns:
-            names = names_for(column)
-            by_value.setdefault(column.value, []).extend(names)
-            all_names.extend(names)
-        shapes: list[tuple[list[str], str, TypeExpr]] = []
-        for value, names in by_value.items():
-            shapes.append((names, COMPARE, value))
-            shapes.append(
-                (
-                    names,
-                    COLLECTION,
-                    Union((Sub("list", (value,)), Sub("tuple", (value, "...")))),
+    def groups(self, table: Table, *, bare: bool = False) -> list[str]:
+        key = (table.attribute, bare)
+        if key not in self.group_cache:
+            self.group_cache[key] = [
+                _literal(
+                    [
+                        name
+                        for column in table.columns
+                        if column.value == value
+                        for name in self.references(table, column, bare=bare)
+                    ]
                 )
-            )
-            if _string_like(value):
-                shapes.append((names, PATTERN, "str"))
-        shapes.append((all_names, NULL_TEST, "None"))
-        return shapes
-
-    def scope_names(self, table: Table) -> Callable[[Column], list[str]]:
-        return lambda column: self.model.references(table, column.name)
-
-    def all_names(self, table: Table) -> Callable[[Column], list[str]]:
-        return lambda column: self.model.spellings(table, column.name)
+                for value in self.values
+            ]
+        return self.group_cache[key]
 
     def by_value(
-        self, table: Table, names_for: Callable[[Column], list[str]]
+        self, table: Table, *, bare: bool = False
     ) -> dict[tuple[str, bool], list[str]]:
         groups: dict[tuple[str, bool], list[str]] = {}
         for column in table.columns:
             groups.setdefault((column.value, column.nullable), []).extend(
-                names_for(column)
+                self.references(table, column, bare=bare)
             )
         return groups
 
-    # --- sections
+    def overload(self, name: str, parameters: str, returns: str) -> None:
+        self.lines.extend(
+            [
+                "    @overload",
+                f"    def {name}({parameters}) -> {returns}: ...",
+            ]
+        )
 
-    def render(self, *, source: str, output: str) -> str:
-        """Build projection type IR; the stub backend lowers fields and scope."""
-        self.emit(["from __future__ import annotations"])
-        self.imports()
-        for statement in self.model.body:
-            self.emit([statement, "", ""])
-        self.aliases()
-        self.emit(["", "if TYPE_CHECKING:"])
+    def joined(
+        self,
+        tables: str = "TablesT",
+        columns: str = "ColumnT",
+        null: str = "NullT",
+        star: str = "StarT",
+        fields: str = "*FieldsT",
+        groups: list[str] | None = None,
+    ) -> str:
+        args = [
+            tables,
+            columns,
+            null,
+            star,
+            *(self.group_vars if groups is None else groups),
+            fields,
+        ]
+        return f"DatabaseQuery[{', '.join(args)}]"
+
+    def ordering(self, query: Callable[[str], str], columns: str) -> None:
+        self.overload(
+            "order_by",
+            f"self, column: {columns}, direction: OrderDirection = 'asc'",
+            query("*FieldsT"),
+        )
+        for depth in range(1, ORDER_DEPTH + 1):
+            fields = ", ".join(
+                [
+                    *(f"Field[K{i}, V{i}]" for i in range(1, depth + 1)),
+                    "*RestT",
+                ]
+            )
+            receiver = query(fields)
+            self.overload(
+                "order_by",
+                f"self: {receiver}, column: K{depth}, "
+                "direction: OrderDirection = 'asc'",
+                receiver,
+            )
+
+    def join_methods(self, *, single: bool = False) -> None:
+        tables, columns, null, star = (
+            ("TableT", "ScopeT", "Never", "Literal['']")
+            if single
+            else ("TablesT", "ColumnT", "NullT", "StarT")
+        )
+        for kind in ("inner", "left", "right", "full"):
+            for table in self.model.tables:
+                scope = f"{columns} | {table.scope_alias}"
+                nullable = (
+                    f"{null} | {table.token}" if kind in {"left", "full"} else null
+                )
+                marked = "Literal['*']" if kind in {"right", "full"} else star
+                groups = [
+                    f"{old} | {new}"
+                    for old, new in zip(
+                        self.group_vars, self.groups(table), strict=True
+                    )
+                ]
+                self.overload(
+                    f"{kind}_join",
+                    f"self, table: {table.token}, left: {scope}, right: {scope}",
+                    self.joined(
+                        f"{tables} | {table.token}",
+                        scope,
+                        nullable,
+                        marked,
+                        groups=groups,
+                    ),
+                )
+
+    def joined_query(self) -> None:
+        groups = ", ".join(self.group_vars)
+        builder = f"DatabaseExpressionBuilder[ColumnT, {groups}]"
+        self.lines.append(
+            f"class DatabaseQuery(_Predicates[{builder}, ColumnT, {groups}], "
+            "_QueryScope[TablesT, NullT], QueryCore[ColumnT, StarT, *FieldsT], "
+            f"Generic[TablesT, ColumnT, NullT, StarT, {groups}, *FieldsT]):"
+        )
+        for table in self.model.tables:
+            tables = f"TablesT | {table.token}"
+            for column in table.columns:
+                # Already-nullable values need no outer-join-specific overload.
+                variants = [("NullT", column.annotation)]
+                if not column.nullable:
+                    variants.insert(
+                        0, (f"NullT | {table.token}", _nullable(column.value))
+                    )
+                for null, value in variants:
+                    # Scope-only receivers avoid mypy widening variadic field packs.
+                    self.overload(
+                        "select",
+                        f"self: _QueryScope[{tables}, {null}], "
+                        f"selections: {_literal(self.references(table, column))}",
+                        self.joined(
+                            tables=tables,
+                            null=null,
+                            fields=f"Field[Literal[{column.name!r}], {value}], "
+                            "*FieldsT",
+                        ),
+                    )
+        self.overload(
+            "select",
+            "self, selections: ColumnT | Sequence[ColumnT]",
+            self.joined(fields="Field[str, object], *FieldsT"),
+        )
+        for table in self.model.tables:
+            tables = f"TablesT | {table.token}"
+            for (value, nullable), names in self.by_value(table).items():
+                variants = [("NullT", _nullable(value) if nullable else value)]
+                if not nullable:
+                    variants.insert(0, (f"NullT | {table.token}", _nullable(value)))
+                for null, read in variants:
+                    self.overload(
+                        "select_as",
+                        f"self: _QueryScope[{tables}, {null}], "
+                        f"source: {_literal(names)}, alias: AliasT",
+                        self.joined(
+                            tables=tables,
+                            null=null,
+                            fields=f"Field[AliasT, {read}], *FieldsT",
+                        ),
+                    )
+        self.overload(
+            "select_as",
+            "self, source: ColumnT, alias: str",
+            self.joined(fields="Field[str, object], *FieldsT"),
+        )
+        self.ordering(lambda fields: self.joined(fields=fields), "ColumnT")
+        self.join_methods()
+
+    def single_table_base(self) -> None:
+        groups = ", ".join(self.group_vars)
+        self.lines.append(
+            "class SingleTableQuery(QueryCore[ColumnsT, Literal[''], *FieldsT], "
+            f"Generic[TableT, ColumnsT, ScopeT, {groups}, *FieldsT]):"
+        )
+        self.join_methods(single=True)
+
+    def table_query(self, table: Table) -> None:
+        groups = ", ".join(self.groups(table, bare=True))
+        scoped = ", ".join(self.groups(table))
+        columns = table.columns_alias
+        builder = f"DatabaseExpressionBuilder[{columns}, {groups}]"
+        self.lines.append(
+            f"class {table.query_class}(_Predicates[{builder}, {columns}, {groups}], "
+            f"SingleTableQuery[{table.token}, {columns}, {table.scope_alias}, "
+            f"{scoped}, *FieldsT], "
+            "Generic[*FieldsT,]):"
+        )
+
+        def query(fields: str) -> str:
+            # Preserve canonical trailing commas in single-pack subscriptions.
+            return f"{table.query_class}[{fields}{',' if fields == '*FieldsT' else ''}]"
+
+        for column in table.columns:
+            selections = _literal(self.references(table, column, bare=True))
+            self.overload(
+                "select",
+                f"self, selections: {selections}",
+                query(
+                    f"Field[Literal[{column.name!r}], {column.annotation}], *FieldsT"
+                ),
+            )
+        self.overload(
+            "select",
+            f"self, selections: {columns} | Sequence[{columns}]",
+            query("Field[str, object], *FieldsT"),
+        )
+        for (value, nullable), names in self.by_value(table, bare=True).items():
+            read = _nullable(value) if nullable else value
+            self.overload(
+                "select_as",
+                f"self, source: {_literal(names)}, alias: AliasT",
+                query(f"Field[AliasT, {read}], *FieldsT"),
+            )
+        self.overload(
+            "select_as",
+            f"self, source: {columns}, alias: str",
+            query("Field[str, object], *FieldsT"),
+        )
+        self.ordering(query, columns)
+
+    def render(self) -> str:
+        self.lines.extend(
+            [
+                "from __future__ import annotations",
+                *self.model.imports,
+                "from collections.abc import Callable, Sequence",
+                "from typing import Generic, Literal, LiteralString, Never, "
+                "TypeAlias, TypeVar, overload",
+                *self.model.body,
+            ]
+        )
+        for table in self.model.tables:
+            self.lines.extend(
+                [
+                    f"{table.columns_alias}: TypeAlias = "
+                    f"{_literal(self.model.column_literals(table))}",
+                    f"{table.scope_alias}: TypeAlias = "
+                    f"{_literal(self.model.scope_literals(table))}",
+                ]
+            )
+        self.lines.append(
+            "TableName: TypeAlias = "
+            f"{_literal([t.attribute for t in self.model.tables])}"
+        )
+        for name in ("TableT", "TablesT", "ColumnsT", "ColumnT", "ScopeT", "NullT"):
+            self.lines.append(f"{name} = TypeVar({name!r}, bound=str)")
+        self.lines.extend(
+            [
+                "FieldsT = TypeVarTuple('FieldsT')",
+                "StarT = TypeVar('StarT', bound=str)",
+                "AliasT = TypeVar('AliasT', bound=LiteralString | Literal[''])",
+                "RestT = TypeVarTuple('RestT')",
+                *(
+                    f"K{i} = TypeVar('K{i}', bound=str)"
+                    for i in range(1, ORDER_DEPTH + 1)
+                ),
+                *(f"V{i} = TypeVar('V{i}')" for i in range(1, ORDER_DEPTH + 1)),
+            ]
+        )
         self.joined_query()
         self.single_table_base()
         for table in self.model.tables:
             self.table_query(table)
         return "\n".join(self.lines)
 
-    def imports(self) -> None:
-        typing_names = {
-            "TYPE_CHECKING",
-            "Any",
-            "Generic",
-            "Literal",
-            "LiteralString",
-            "Never",
-            "TypeAlias",
-            "TypeVar",
-            "cast",
-            "overload",
-        }
-        standard: list[tuple[str, list[str]]] = [
-            ("collections.abc", ["from collections.abc import Callable, Sequence"]),
-        ]
-        for item in self.model.imports:
-            module = item.split()[1]
-            if item.startswith("from typing import "):
-                imported = item.removeprefix("from typing import ")
-                typing_names.update(name.strip() for name in imported.split(","))
-            else:
-                standard.append((module, [item]))
-        standard.append(
-            (
-                "typing",
-                [
-                    "from typing import (",
-                    *[
-                        f"    {name},"
-                        for name in sorted(typing_names, key=_import_order)
-                    ],
-                    ")",
-                ],
-            )
-        )
-        for _, block in sorted(standard, key=lambda entry: entry[0]):
-            self.emit(block)
 
-    def aliases(self) -> None:
-        model = self.model
-        self.emit(
-            [
-                "# XColumns: every spelling, valid while X is the only table in the",
-                "# query. XScope: the spellings that stay unambiguous after a join.",
-            ]
-        )
-        for table in model.tables:
-            for name, names in (
-                (table.columns_alias, model.column_literals(table)),
-                (table.scope_alias, model.scope_literals(table)),
-            ):
-                self.emit([f"{name}: TypeAlias = Literal["])
-                self.emit([f'    "{item}",' for item in names])
-                self.emit(["]"])
-        table_names = [table.attribute for table in model.tables]
-        self.emit(
-            [
-                f"TableName: TypeAlias = {_one_line(_literal(table_names))}",
-                "",
-                "# Query state: tables joined, columns in scope, tables joined",
-                "# nullably, selected fields (newest first), and whether a right or",
-                "# full join made every field nullable.",
-                'TableT = TypeVar("TableT", bound=str)',
-                'TablesT = TypeVar("TablesT", bound=str)',
-                'ColumnsT = TypeVar("ColumnsT", bound=str)',
-                'ColumnT = TypeVar("ColumnT", bound=str)',
-                'ScopeT = TypeVar("ScopeT", bound=str)',
-                'NullT = TypeVar("NullT", bound=str)',
-                'FieldsT = TypeVar("FieldsT")',
-                'StarT = TypeVar("StarT", bound=str)',
-                'AliasT = TypeVar("AliasT", bound=LiteralString | Literal[""])',
-                "# Positions in the selected-field list, for ordering by an alias.",
-                'RestT = TypeVar("RestT")',
-            ]
-        )
-        self.emit(
-            [
-                f'K{depth} = TypeVar("K{depth}", bound=str)'
-                for depth in range(1, ORDER_DEPTH + 1)
-            ]
-            + [f'V{depth} = TypeVar("V{depth}")' for depth in range(1, ORDER_DEPTH + 1)]
-        )
-
-    # --- expression builders
-
-    def builder_impl(self) -> None:
-        self.emit(
-            _signature(
-                "__call__",
-                [
-                    ("self", None),
-                    ("column", "Any"),
-                    ("operator", "Any"),
-                    ("value", "Any"),
-                ],
-                "Expression[bool]",
-                8,
-                body="",
-            )
-        )
-        self.emit(["            return super().__call__(column, operator, value)", ""])
-
-    def select_impls(self) -> None:
-        self.emit(
-            [
-                "        def select(self, selections: Any) -> Any:",
-                "            return super().select(selections)",
-                "",
-            ]
-        )
-
-    def joined_query(self) -> None:
-        model = self.model
-        self.emit(
-            [
-                "    # Joined queries. One overload per column; the nullable form",
-                "    # comes first and only matches once its table is outer-joined.",
-                "    class DatabaseQuery(",
-                f'        TypedSchemaQueryBuilder["{model.database}", ColumnT, '
-                "FieldsT, StarT],",
-                "        Generic[TablesT, ColumnT, NullT, FieldsT, StarT],",
-                "    ):",
-            ]
-        )
-        for table in model.tables:
-            tables = f"TablesT | {table.token}"
-            nullable = f"NullT | {table.token}"
-            for column in table.columns:
-                selections = _literal(model.references(table, column.name))
-                key = f'Literal["{column.name}"]'
-                for null, value in (
-                    (nullable, _nullable(column.value)),
-                    ("NullT", column.annotation),
-                ):
-                    self.overload(
-                        "select",
-                        [
-                            (
-                                "self",
-                                self.joined(
-                                    tables, "ColumnT", null, "FieldsT", "StarT"
-                                ),
-                            ),
-                            ("selections", selections),
-                        ],
-                        self.joined(
-                            tables, "ColumnT", null, self.cons(key, value), "StarT"
-                        ),
-                    )
-        self.overload(
-            "select",
-            [("self", None), ("selections", "ColumnT | Sequence[ColumnT]")],
-            self.joined(
-                "TablesT", "ColumnT", "NullT", self.cons("str", "object"), "StarT"
-            ),
-        )
-        self.select_impls()
-        self.emit(
-            ["        # select_as: grouped by value type; the alias becomes a key."]
-        )
-        for table in model.tables:
-            tables = f"TablesT | {table.token}"
-            nullable = f"NullT | {table.token}"
-            for (value, is_nullable), names in self.by_value(
-                table, self.scope_names(table)
-            ).items():
-                plain = _nullable(value) if is_nullable else value
-                for null, read in ((nullable, _nullable(value)), ("NullT", plain)):
-                    self.overload(
-                        "select_as",
-                        [
-                            (
-                                "self",
-                                self.joined(
-                                    tables, "ColumnT", null, "FieldsT", "StarT"
-                                ),
-                            ),
-                            ("source", _literal(names)),
-                            ("alias", "AliasT"),
-                        ],
-                        self.joined(
-                            tables, "ColumnT", null, self.cons("AliasT", read), "StarT"
-                        ),
-                    )
-        self.overload(
-            "select_as",
-            [("self", None), ("source", "ColumnT"), ("alias", "str")],
-            self.joined(
-                "TablesT", "ColumnT", "NullT", self.cons("str", "object"), "StarT"
-            ),
-        )
-        self.emit(
-            [
-                "        def select_as(self, source: Any, alias: str) -> Any:",
-                "            return self._select_as(source, alias)",
-                "",
-                "        # where: operator families take different value shapes.",
-            ]
-        )
-        for table in model.tables:
-            tables = f"TablesT | {table.token}"
-            query = self.joined(tables, "ColumnT", "NullT", "FieldsT", "StarT")
-            for names, operator, shape in self.shapes(table, self.scope_names(table)):
-                self.overload(
-                    "where",
-                    [
-                        ("self", query),
-                        ("column", _literal(names)),
-                        ("operator", operator),
-                        ("value", shape),
-                    ],
-                    query,
-                )
-        self.overload(
-            "where",
-            [
-                ("self", None),
-                (
-                    "column",
-                    Sub(
-                        "Callable",
-                        (
-                            Sub("", ("DatabaseExpressionBuilder[TablesT, ColumnT]",)),
-                            "Expression[bool]",
-                        ),
-                    ),
-                ),
-            ],
-            self.joined("TablesT", "ColumnT", "NullT", "FieldsT", "StarT"),
-        )
-        self.where_impl()
-        self.having(
-            self.joined("TablesT", "ColumnT", "NullT", "FieldsT", "StarT"),
-            "DatabaseExpressionBuilder[TablesT, ColumnT]",
-        )
-        self.ordering(
-            lambda fields: self.joined("TablesT", "ColumnT", "NullT", fields, "StarT"),
-            "ColumnT",
-        )
-        self.emit(
-            [
-                "        # joins: the ON columns may use the prior scope and the new",
-                "        # table. Outer joins record which side may be missing.",
-            ]
-        )
-        for kind in ("inner", "left", "right", "full"):
-            for table in model.tables:
-                self.overload(
-                    f"{kind}_join",
-                    [
-                        ("self", None),
-                        ("table", table.token),
-                        ("left", f"ColumnT | {table.scope_alias}"),
-                        ("right", f"ColumnT | {table.scope_alias}"),
-                    ],
-                    self.join_result(
-                        kind, table, "TablesT", "ColumnT", "NullT", "StarT"
-                    ),
-                )
-            self.join_impl(kind, "DatabaseQuery")
-
-    def join_result(
-        self, kind: str, table: Table, tables: str, columns: str, null: str, star: str
-    ) -> Sub:
-        marked = f"{null} | {table.token}" if null != "Never" else table.token
-        return self.joined(
-            f"{tables} | {table.token}",
-            f"{columns} | {table.scope_alias}",
-            marked if kind in {"left", "full"} else null,
-            "FieldsT",
-            'Literal["*"]' if kind in {"right", "full"} else star,
-        )
-
-    def where_impl(self) -> None:
-        self.emit(
-            _signature(
-                "where",
-                [
-                    ("self", None),
-                    ("column", "Any"),
-                    ("operator: Any = None", None),
-                    ("value: Any = None", None),
-                ],
-                "Any",
-                8,
-                body="",
-            )
-        )
-        self.emit(
-            [
-                "            if isinstance(column, str):",
-                "                name = cast(Any, column)",
-                "                return super().where(name, operator, value)",
-                "            return super().where(column)",
-                "",
-            ]
-        )
-
-    def join_impl(self, kind: str, cls: str) -> None:
-        self.emit(
-            [
-                f"        def {kind}_join(self, table: Any, left: Any, right: Any)"
-                " -> Any:",
-                f'            return self._join("{kind}", table, left, right)',
-                "",
-            ]
-        )
-
-    def single_table_base(self) -> None:
-        model = self.model
-        self.emit(
-            [
-                "    # Single-table queries. Each table gets its own class so the",
-                "    # editor only weighs that table's overloads; joins move to",
-                "    # DatabaseQuery.",
-                "    class SingleTableQuery(",
-                f'        TypedSchemaQueryBuilder["{model.database}", ColumnsT, '
-                "FieldsT, Never],",
-                "        Generic[TableT, ColumnsT, ScopeT, FieldsT],",
-                "    ):",
-            ]
-        )
-        for kind in ("inner", "left", "right", "full"):
-            for table in model.tables:
-                self.overload(
-                    f"{kind}_join",
-                    [
-                        ("self", None),
-                        ("table", table.token),
-                        ("left", f"ScopeT | {table.scope_alias}"),
-                        ("right", f"ScopeT | {table.scope_alias}"),
-                    ],
-                    self.join_result(kind, table, "TableT", "ScopeT", "Never", "Never"),
-                )
-            self.emit(
-                [
-                    f"        def {kind}_join(self, table: Any, left: Any, right: Any)"
-                    " -> Any:",
-                    "            query = self._query.join("
-                    f'"{kind}", table, left, right)',
-                    "            joined: DatabaseQuery[Any, Any, Any, Any, Any] = "
-                    "DatabaseQuery(",
-                    "                cast(Any, query.typed(DatabaseExpressionBuilder))",
-                    "            )",
-                    "            return joined",
-                    "",
-                ]
-            )
-
-    def table_query(self, table: Table) -> None:
-        model = self.model
-        cls = table.query_class
-        result = Sub(cls, ("FieldsT",))
-        self.emit(
-            [
-                f"    class {cls}(",
-                f"        SingleTableQuery[{table.token}, {table.columns_alias}, "
-                f"{table.scope_alias}, FieldsT],",
-                "        Generic[FieldsT],",
-                "    ):",
-            ]
-        )
-        for column in table.columns:
-            self.overload(
-                "select",
-                [
-                    ("self", None),
-                    ("selections", _literal(model.spellings(table, column.name))),
-                ],
-                Sub(cls, (self.cons(f'Literal["{column.name}"]', column.annotation),)),
-            )
-        self.overload(
-            "select",
-            [
-                ("self", None),
-                (
-                    "selections",
-                    f"{table.columns_alias} | Sequence[{table.columns_alias}]",
-                ),
-            ],
-            Sub(cls, (self.cons("str", "object"),)),
-        )
-        self.select_impls()
-        for (value, is_nullable), names in self.by_value(
-            table, self.all_names(table)
-        ).items():
-            read = _nullable(value) if is_nullable else value
-            self.overload(
-                "select_as",
-                [("self", None), ("source", _literal(names)), ("alias", "AliasT")],
-                Sub(cls, (self.cons("AliasT", read),)),
-            )
-        self.overload(
-            "select_as",
-            [("self", None), ("source", table.columns_alias), ("alias", "str")],
-            Sub(cls, (self.cons("str", "object"),)),
-        )
-        self.emit(
-            [
-                "        def select_as(self, source: Any, alias: str) -> Any:",
-                "            return self._select_as(source, alias)",
-                "",
-            ]
-        )
-        for names, operator, shape in self.shapes(table, self.all_names(table)):
-            self.overload(
-                "where",
-                [
-                    ("self", None),
-                    ("column", _literal(names)),
-                    ("operator", operator),
-                    ("value", shape),
-                ],
-                result,
-            )
-        builder = f"DatabaseExpressionBuilder[{table.token}, {table.columns_alias}]"
-        self.overload(
-            "where",
-            [
-                ("self", None),
-                ("column", Sub("Callable", (Sub("", (builder,)), "Expression[bool]"))),
-            ],
-            result,
-        )
-        self.where_impl()
-        self.having(result, builder)
-        self.ordering(lambda fields: Sub(cls, (fields,)), table.columns_alias)
-
-
-# Pyright stops analysing a module whose top-level code flow exceeds its
-# complexity limit; empirically that is about 15,000 function definitions.
+# Keep generated modules below Pyright's observed code-flow complexity ceiling.
 PYRIGHT_DEFINITION_CEILING = 14_000
-
-
-def _expr(source: str) -> ast.expr:
-    return ast.parse(source, mode="eval").body
-
-
-def _args(node: ast.Subscript) -> list[ast.expr]:
-    return list(node.slice.elts) if isinstance(node.slice, ast.Tuple) else [node.slice]
-
-
-class _StubTypes(ast.NodeTransformer):
-    def __init__(self, model: SchemaModel, values: list[str]) -> None:
-        self.model = model
-        self.values = values
-        self.group_vars = [f"G{i}" for i in range(len(values))]
-        self.current_class = ""
-        self.join_table: Table | None = None
-        self.projection = False
-        self.receiver = False
-
-    def groups(self, table: Table, *, bare: bool = False) -> list[str]:
-        result: list[str] = []
-        for value in self.values:
-            names = [
-                name
-                for column in table.columns
-                if column.value == value
-                for name in (
-                    self.model.spellings(table, column.name)
-                    if bare
-                    else self.model.references(table, column.name)
-                )
-            ]
-            result.append(
-                "Literal[" + ", ".join(repr(n) for n in names) + "]"
-                if names
-                else "Never"
-            )
-        return result
-
-    def fields(self, node: ast.expr) -> list[ast.expr]:
-        if isinstance(node, ast.Name) and node.id == "Nil":
-            return []
-        if isinstance(node, ast.Name) and node.id in {"FieldsT", "RestT"}:
-            return [ast.Starred(value=node, ctx=ast.Load())]
-        if isinstance(node, ast.Subscript) and ast.unparse(node.value) == "Cons":
-            key, value, rest = _args(node)
-            return [
-                _expr(f"Field[{ast.unparse(key)}, {ast.unparse(value)}]"),
-                *self.fields(rest),
-            ]
-        return [node]
-
-    def visit_Subscript(self, node: ast.Subscript) -> ast.expr:
-        name = ast.unparse(node.value)
-        args = _args(node)
-        if name == "TypedSchemaQueryBuilder":
-            _, columns, fields, star = args
-            if ast.unparse(star) == "Never":
-                star = _expr('Literal[""]')
-            return _expr(
-                f"QueryCore[{ast.unparse(columns)}, {ast.unparse(star)}, "
-                + ", ".join(ast.unparse(f) for f in self.fields(fields))
-                + "]"
-            )
-        if name == "DatabaseExpressionBuilder":
-            table = next(
-                (
-                    t
-                    for t in self.model.tables
-                    if ast.unparse(args[0]) == ast.unparse(_expr(t.token))
-                ),
-                None,
-            )
-            builder_columns = ast.unparse(args[1])
-            groups = self.groups(table, bare=True) if table else self.group_vars
-            return _expr(
-                f"DatabaseExpressionBuilder[{builder_columns}, {', '.join(groups)}]"
-            )
-        if name == "DatabaseQuery":
-            tables, columns, null, fields, star = args
-            if self.projection and self.receiver:
-                # Do not unpack fields in an explicit scope-checking receiver:
-                # mypy can widen tables/nullability when inferring that pack.
-                # The non-variadic base checks membership; class-level FieldsT
-                # still carries the exact flat selection into the return type.
-                return _expr(f"_QueryScope[{ast.unparse(tables)}, {ast.unparse(null)}]")
-            if ast.unparse(star) == "Never":
-                star = _expr('Literal[""]')
-            groups = self.group_vars
-            if self.join_table is not None:
-                groups = [
-                    f"{g} | {new}"
-                    for g, new in zip(groups, self.groups(self.join_table), strict=True)
-                ]
-            args = [
-                tables,
-                columns,
-                null,
-                star,
-                *[_expr(g) for g in groups],
-                *self.fields(fields),
-            ]
-        elif name == "SingleTableQuery":
-            table = next(
-                t
-                for t in self.model.tables
-                if ast.unparse(args[0]) == ast.unparse(_expr(t.token))
-            )
-            args = [
-                *args[:3],
-                *[_expr(g) for g in self.groups(table)],
-                *self.fields(args[3]),
-            ]
-        elif name == "Generic":
-            args = [f for arg in args for f in self.fields(arg)]
-            if self.current_class in {"DatabaseQuery", "SingleTableQuery"}:
-                args = (
-                    [a for a in args if not isinstance(a, ast.Starred)]
-                    + [_expr(g) for g in self.group_vars]
-                    + [
-                        ast.Starred(
-                            value=ast.Name(id="FieldsT", ctx=ast.Load()), ctx=ast.Load()
-                        )
-                    ]
-                )
-        elif name in {t.query_class for t in self.model.tables}:
-            args = [f for arg in args for f in self.fields(arg)]
-        else:
-            self.generic_visit(node)
-            return node
-        node.slice = ast.Tuple(elts=args, ctx=ast.Load())
-        return node
-
-    def visit_ClassDef(self, node: ast.ClassDef) -> ast.ClassDef:
-        self.current_class = node.name
-        overloaded = {
-            n.name
-            for n in node.body
-            if isinstance(n, ast.FunctionDef)
-            and any(ast.unparse(d) == "overload" for d in n.decorator_list)
-        }
-        query = node.name == "DatabaseQuery" or node.name in {
-            t.query_class for t in self.model.tables
-        }
-        node.body = [
-            n
-            for n in node.body
-            if not (
-                isinstance(n, ast.FunctionDef)
-                and (
-                    (n.name in overloaded and not n.decorator_list)
-                    or (query and n.name in {"where", "having"})
-                )
-            )
-        ]
-        self.generic_visit(node)
-        if query:
-            if node.name == "DatabaseQuery":
-                columns, groups = "ColumnT", self.group_vars
-                node.bases.insert(0, _expr("_QueryScope[TablesT, NullT]"))
-            else:
-                table = next(t for t in self.model.tables if t.query_class == node.name)
-                columns, groups = table.columns_alias, self.groups(table, bare=True)
-            builder = f"DatabaseExpressionBuilder[{columns}, {', '.join(groups)}]"
-            node.bases.insert(
-                0, _expr(f"_Predicates[{builder}, {columns}, {', '.join(groups)}]")
-            )
-        return node
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
-        self.projection = node.name in {"select", "select_as"}
-        self.receiver = True
-        self.visit(node.args)
-        self.receiver = False
-        if node.name.endswith("_join"):
-            annotation = next(a.annotation for a in node.args.args if a.arg == "table")
-            assert annotation is not None
-            self.join_table = next(
-                t
-                for t in self.model.tables
-                if ast.unparse(_expr(t.token)) == ast.unparse(annotation)
-            )
-        node.body = [ast.Expr(value=ast.Constant(value=Ellipsis))]
-        if node.returns is not None:
-            node.returns = self.visit(node.returns)
-        self.join_table = None
-        self.projection = False
-        return node
 
 
 class _StubCleanup(ast.NodeTransformer):
@@ -1274,18 +680,10 @@ def generate_stub(source: str, *, source_name: str = "dbschema.py") -> str:
         )
     if len({t.alias for t in model.tables}) != len(model.tables):
         raise SchemaError("Each table must have a distinct class/query name")
-    tree = ast.parse(_Renderer(model).render(source=source_name, output="dbschema.py"))
+    tree = ast.parse(_Renderer(model, values).render())
     nodes: list[ast.stmt] = []
-    transform = _StubTypes(model, values)
     for node in tree.body:
-        if isinstance(node, ast.If):
-            nodes.extend(
-                transform.visit(n)
-                for n in node.body
-                if isinstance(n, ast.ClassDef)
-                and n.name not in {"DatabaseExpressionBuilder", "DatabaseClient"}
-            )
-        elif (
+        if (
             (isinstance(node, ast.ClassDef) and node.name == model.database)
             or (
                 isinstance(node, ast.Assign)
@@ -1296,20 +694,7 @@ def generate_stub(source: str, *, source_name: str = "dbschema.py") -> str:
             or (isinstance(node, ast.ImportFrom) and node.module == "pysely")
         ):
             continue
-        elif isinstance(node, ast.ImportFrom) and node.module == "typing":
-            node.names = [
-                n for n in node.names if n.name not in {"TYPE_CHECKING", "cast"}
-            ]
-            nodes.append(node)
-        elif isinstance(node, ast.Expr):
-            continue
-        else:
-            if isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id in {"FieldsT", "RestT"}
-                for t in node.targets
-            ):
-                assert isinstance(node.value, ast.Call)
-                node.value.func = ast.Name(id="TypeVarTuple", ctx=ast.Load())
+        if not isinstance(node, ast.Expr):
             nodes.append(node)
     extra = ast.parse(
         "from typing import Self, TypeVarTuple\n"
@@ -1379,8 +764,11 @@ def generate_stub(source: str, *, source_name: str = "dbschema.py") -> str:
     # A one-table schema has one join signature, not an overload set.
     for cls in (n for n in module.body if isinstance(n, ast.ClassDef)):
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
+        counts: dict[str, int] = {}
         for method in methods:
-            if sum(n.name == method.name for n in methods) == 1:
+            counts[method.name] = counts.get(method.name, 0) + 1
+        for method in methods:
+            if counts[method.name] == 1:
                 method.decorator_list = [
                     d for d in method.decorator_list if ast.unparse(d) != "overload"
                 ]
@@ -1406,6 +794,6 @@ def generate(
     """Generate the typing interface for an existing handwritten schema module."""
     if not output.endswith(".pyi"):
         raise SchemaError(
-            "Codegen only writes .pyi stubs; keep the schema .py handwritten"
+            "Typgen only writes .pyi stubs; keep the schema .py handwritten"
         )
     return generate_stub(source, source_name=source_name)

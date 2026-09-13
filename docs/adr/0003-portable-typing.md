@@ -1,27 +1,23 @@
 # ADR 0003: Portable and enhanced typing
 
-Status: accepted
+Status: superseded by [ADR 0007](0007-type-only-typgen.md), via
+[ADR 0006](0006-generated-typed-interfaces.md).
 
-Schema-specific clients use ordinary `Literal` types, overloads, and generic query
-scope so standard Python language servers can complete tables and currently
-available columns without a Pysely editor extension.
+## Original direction
 
-The reusable runtime remains schema-independent. Generated clients wrap it and do
-not duplicate SQL construction or execution. Strict generated entry points avoid a
-blanket `str` overload because that would accept misspellings and suppress useful
-literal completion.
+Use literal types, overloads, and generic query scope for table and column
+completion in ordinary Python editors.
 
-Database introspection is not implemented. Arbitrary projection aliases and some
-column-to-value relationships remain beyond the portable contract.
+Keep the runtime schema-independent. Avoid broad `str` overloads that would
+silently accept misspelled columns.
 
-Superseded by [ADR 0007](0007-type-only-typgen.md), following
-[ADR 0006](0006-generated-typed-interfaces.md): `pysely typgen` now writes only
-adjacent `.pyi` stubs. No generated runtime client or checker plugin is required.
-The implementation and limitations described above are historical.
+## What changed
 
-The docs playground runs real Python compilation and stock browser-hosted Pyright.
-Its language intelligence must represent VS Code using the same public types and
-equivalent checker settings. Do not mock completions or rewrite, group, or suppress
-diagnostics for a browser-only improvement. Improve the Python typing contract or
-upstream checker instead; retain honest limitations where portable typing cannot
-resolve them.
+- The optional mypy plugin was removed.
+- Generated runtime clients were replaced by adjacent `.pyi` stubs.
+- `pysely typgen` now serves mypy and Pyright from one interface.
+
+## Principle retained
+
+The playground uses real Python compilation and stock Pyright.
+Do not mock completion or filter diagnostics to hide typing limitations.

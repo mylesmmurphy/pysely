@@ -1,0 +1,135 @@
+{
+  "baseline_commit": "748fed4305f12b5bc45088b9dc0f22612af6311a",
+  "environment": {
+    "machine": "macOS 14.6.1 x86_64",
+    "python": "3.11.4",
+    "pyright": "1.1.413",
+    "mypy": "1.20.2"
+  },
+  "schema": {
+    "tables": 20,
+    "columns": 333
+  },
+  "notes": [
+    "Cold checker timings are single runs, not guarantees.",
+    "Initial exploratory runs overlapped other checks; paired direct/alias runs used five completion edits without task test processes.",
+    "Completion item counts were unchanged: single 20, join2 27, join3 44.",
+    "The 100-table comparison measures generation only, not full checker or LSP performance."
+  ],
+  "runs": {
+    "baseline_3_edits": {
+      "tables": 20,
+      "columns": 333,
+      "generated_bytes": 581860,
+      "generation_seconds": 2.578,
+      "overloads": 1932,
+      "pyright_cold_seconds": 3.5,
+      "mypy_cold_seconds": 52.05,
+      "mypy_warm_seconds": 0.3,
+      "completion_ms": {
+        "single": 119,
+        "join2": 734,
+        "join3": 1159
+      }
+    },
+    "nullable_only_3_edits": {
+      "generated_bytes": 557334,
+      "overloads": 1852,
+      "generation_seconds": 2.222,
+      "pyright_cold_seconds": 3.33,
+      "mypy_cold_seconds": 39.19,
+      "mypy_warm_seconds": 0.24,
+      "completion_ms": {
+        "single": 74,
+        "join2": 685,
+        "join3": 1010
+      }
+    },
+    "direct_exploratory_3_edits": {
+      "generated_bytes": 557334,
+      "overloads": 1852,
+      "generation_seconds": 1.621,
+      "pyright_cold_seconds": 4.4,
+      "mypy_cold_seconds": 51.05,
+      "mypy_warm_seconds": 0.24,
+      "completion_ms": {
+        "single": 86,
+        "join2": 817,
+        "join3": 1044
+      }
+    },
+    "aliases_exploratory_3_edits": {
+      "generated_bytes": 525828,
+      "overloads": 1852,
+      "generation_seconds": 1.765,
+      "pyright_cold_seconds": 3.41,
+      "mypy_cold_seconds": 44.19,
+      "mypy_warm_seconds": 0.24,
+      "completion_ms": {
+        "single": 81,
+        "join2": 634,
+        "join3": 987
+      }
+    },
+    "accepted_direct_5_edits": {
+      "generated_bytes": 557334,
+      "overloads": 1852,
+      "generation_seconds": 1.549,
+      "pyright_cold_seconds": 3.6,
+      "mypy_cold_seconds": 45.12,
+      "mypy_warm_seconds": 0.24,
+      "completion_ms": {
+        "single": 75,
+        "join2": 593,
+        "join3": 962
+      }
+    },
+    "rejected_aliases_5_edits": {
+      "generated_bytes": 525828,
+      "overloads": 1852,
+      "generation_seconds": 1.329,
+      "pyright_cold_seconds": 3.3,
+      "mypy_cold_seconds": 40.44,
+      "mypy_warm_seconds": 0.25,
+      "completion_ms": {
+        "single": 90,
+        "join2": 790,
+        "join3": 1217
+      }
+    }
+  },
+  "decisions": {
+    "nullable_overloads": "accepted",
+    "cross_table_signatures": "rejected tested candidates: lost receiver/key correlation or invalid generic inference",
+    "state_aliases": "rejected: smaller output but slower joined completions in paired run",
+    "direct_renderer": "accepted; declaration equivalence checked before adding aliases"
+  },
+  "generation_only_comparison": [
+    {
+      "tables": 20,
+      "baseline": {
+        "bytes": 581860,
+        "overloads": 1932,
+        "seconds": 2.409
+      },
+      "accepted": {
+        "bytes": 557334,
+        "overloads": 1852,
+        "seconds": 1.352
+      }
+    },
+    {
+      "tables": 100,
+      "baseline": {
+        "bytes": 2915524,
+        "overloads": 9556,
+        "seconds": 28.93
+      },
+      "accepted": {
+        "bytes": 2789230,
+        "overloads": 9147,
+        "seconds": 7.779
+      }
+    }
+  ]
+}

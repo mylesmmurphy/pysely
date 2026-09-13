@@ -1,11 +1,13 @@
-# ADR 0004: PGlite is a first-party dialect target
+# ADR 0004: PGlite runtime
 
-Status: planned
+Status: planned.
 
-PGlite support is planned after PostgreSQL, MySQL, and SQLite meet the project's
-production-readiness requirements. Pysely does not currently support PGlite.
+## Current boundary
 
-References:
+PGlite has an offline compilation profile, but no Pysely runtime adapter.
+Runtime support comes after PostgreSQL, MySQL, and SQLite meet the release requirements.
 
-- https://github.com/electric-sql/pglite
-- https://github.com/electric-sql/pglite-bindings
+## References
+
+- [PGlite](https://github.com/electric-sql/pglite)
+- [PGlite bindings](https://github.com/electric-sql/pglite-bindings)

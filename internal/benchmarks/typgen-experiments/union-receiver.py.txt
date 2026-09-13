@@ -1,0 +1,17 @@
+from typing import Generic, Literal, TypeVar
+
+C = TypeVar("C", bound=str)
+
+class Scope(Generic[C]):
+    pass
+
+class Query(Scope[C]):
+    def select(
+        self: Scope[C | Literal["a"]] | Scope[C | Literal["b"]],
+        key: Literal["a.id", "b.id"],
+    ) -> int:
+        return 0
+
+def check(a: Query[Literal["a"]]) -> None:
+    a.select("a.id")
+    a.select("b.id")  # must be an error, but the receiver/key correlation is lost

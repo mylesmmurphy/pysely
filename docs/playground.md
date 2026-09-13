@@ -39,16 +39,26 @@ hide:
   <pre id="playground-error" role="alert" hidden></pre>
 </div>
 
-- Run compiles a query in your browser with the selected dialect. No database
-  connection is required.
-- Every edit to the tables reruns `pysely typgen` in the browser. The
-  generated `schema.pyi` is what Pyright checks `query.py` against; the
-  **schema.pyi** tab shows it. Python executes your handwritten `schema.py`, never
-  the generated stub. There is no generated runtime module.
-- Suggestions and diagnostics come from stock Pyright (`standard` mode) in a
-  browser worker.
-- `run_query` shows the typed result; the playground does not execute it.
-- See [Type generation](typgen.md) for the same flow outside the browser.
+## Try it
+
+1. Edit a table or column in **Tables**.
+2. Write a query in **Query** and use the editor's suggestions.
+3. Choose a dialect and press **Run** to inspect SQL and bound parameters.
+4. Open **schema.pyi** to see the generated types.
+
+Run compiles SQL; it does not send queries to a database.
+The example's `run_query` function demonstrates result typing but is not executed.
+
+## What happens when you edit?
+
+- Schema edits regenerate the adjacent `.pyi` stub with `pysely typgen`.
+- Pyright reads the stub for completion and type errors.
+- Python executes handwritten `schema.py`, never the stub.
+
+There is no generated runtime module. Diagnostics come from stock Pyright in
+`standard` mode; Pysely does not hide or rewrite them.
+
+[Set up the same workflow locally →](typgen.md)
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

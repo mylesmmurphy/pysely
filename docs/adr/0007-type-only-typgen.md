@@ -1,29 +1,59 @@
-# 0007: Handwritten schemas with adjacent type stubs
+# ADR 0007: Handwritten schemas and type stubs
 
-Supersedes ADR 0006's generated runtime modules and nested rows.
+Status: accepted. Supersedes [ADR 0006](0006-generated-typed-interfaces.md).
 
-The only schema-specific generated file is `.pyi`. `SchemaDefinition.connect()`
-binds a handwritten schema to a dialect and creates the shared `SchemaClient`.
-All query execution uses shared `FlatQuery`/`QueryCore` implementations. The
-generated client/query classes describe those objects; they do not exist at
-runtime and must only be imported under `TYPE_CHECKING` when used in annotations.
+## Decision
 
-Predicate and callback overloads are generated once per schema value family.
-Queries carry scoped column unions as generic arguments. Exact string `select`
-and table-grouped `select_as` retain their previous mapping/nullability rules.
-Selected fields form a flat `TypeVarTuple`, with a shared 64-position row stub.
+Generate only adjacent `.pyi` stubs with `pysely typgen`.
+Do not generate schema-specific runtime implementations.
 
-Scope checking lives in a separate `_QueryScope` base. Combining scope-dependent
-explicit receivers and variadic fields in one receiver caused incorrect mypy
-nullability inference. The non-variadic scope base lets both checkers validate
-membership while retaining the query's class-level field pack. No checker-specific
-branches, plugins, or configuration are required.
+`SchemaDefinition.connect()` binds the handwritten schema to a dialect.
+Shared `SchemaClient`, `FlatQuery`, and `QueryCore` code handles execution.
 
-Limits: exact `select` still generates per-column overloads and remains the
-large-schema bottleneck. Enum completion lists can include unrelated values;
-both checkers still reject invalid arguments. Right/full-join nullability remains
-conservative; list projections and dynamic aliases retain their existing limits.
+Generated client and query names describe those runtime objects.
+They exist only in stubs; annotation imports require `TYPE_CHECKING`.
 
-The fixed-scope TOML prototype and generated-runtime path were removed, not kept
-as compatibility modes. Generated stubs use compact formatting independent of
-developer formatter versions; their public signatures are checked directly.
+## Type representation
+
+- Predicates and callbacks share overloads by schema value type.
+- Generic column unions track which columns are available.
+- `select` preserves the selected key and value type.
+- `select_as` groups columns by value type and tracks the alias.
+- A flat `TypeVarTuple` stores result fields; the row stub supports 64 lookup positions.
+
+## Why a separate scope base?
+
+Putting scope checks and variadic result fields in one explicit receiver caused
+incorrect mypy nullability inference.
+
+The non-variadic `_QueryScope` base checks table membership.
+The query's field pack retains the selected result types.
+
+Both checkers use the same declarations. No checker-specific branches or plugins are required.
+
+## Remaining limits
+
+- Exact `select` overloads remain the large-schema bottleneck.
+- Enum completion may suggest unrelated values; invalid arguments still fail.
+- Right/full joins use conservative nullability.
+- Lists and dynamic aliases retain their documented typing limits.
+
+See [Schema and typing](../typing.md) for user-facing details.
+
+## Removed approaches
+
+The fixed-scope TOML prototype and generated-runtime path were removed.
+They are not compatibility modes.
+
+Stubs use deterministic compact formatting. Tests check their public signatures directly.
+
+## Generator optimization follow-up
+
+Already-nullable columns use one projection overload, preserving the existing
+join state. Required columns retain separate normal and outer-join forms.
+
+The renderer emits final stub signatures directly. It no longer builds runtime
+wrappers or nested field types just to transform and discard them.
+
+Cross-table signature merging failed scope or inference checks in the tested
+prototypes. State aliases reduced bytes but slowed joined completions; neither was kept.

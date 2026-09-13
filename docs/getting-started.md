@@ -1,9 +1,10 @@
 # Getting started
 
-## Install
+Run a typed query against an in-memory SQLite database. No database server needed.
 
-These docs track the repository's `main` branch, including the new `typgen`
-command. Install that source with the driver extra for your database:
+Pysely is pre-alpha. These docs use `main`, not an older PyPI release.
+
+## 1. Install
 
 === "uv"
 
@@ -17,113 +18,99 @@ command. Install that source with the driver extra for your database:
     pip install "pysely[sqlite] @ git+https://github.com/mylesmmurphy/pysely.git@main"
     ```
 
-Use `postgres` or `mysql` instead of `sqlite` for those databases. Pysely is
-currently a pre-alpha development release.
+Using PostgreSQL or MySQL? See [Dialects](dialects.md).
 
-## Define your database
+## 2. Describe a table
 
-Use one annotated class per table and a database class mapping table names to
-those types. Keep schema definitions separate from connection setup.
+Create `dbschema.py`:
 
 ```python
-# dbschema.py
-from datetime import datetime
-from typing import Literal
 from pysely import SchemaDefinition
 
 
-class UserTable:
+class PersonTable:
     id: int
-    email: str
-    display_name: str | None
-    role: Literal["admin", "member"]
-    verified: bool
-    created_at: datetime
+    first_name: str
 
 
 class DatabaseSchema(SchemaDefinition):
-    users: UserTable
+    person: PersonTable
 ```
 
-## Generate the typed client
+`person` is the SQL table name. Its attributes describe column names and Python types.
 
-Run the generator once, and again whenever the schema changes:
+These declarations do not create or migrate database tables.
+
+## 3. Generate editor types
 
 ```bash
 pysely typgen dbschema.py
 ```
 
-`dbschema.pyi` is an adjacent type-only interface. Commit it alongside your
-handwritten `dbschema.py`. See [Type generation](typgen.md).
+This creates `dbschema.pyi`. Keep it beside `dbschema.py` and regenerate it after schema edits.
 
-## Connect and query
+Only the stub is generated. Python never loads it; there is no generated runtime module.
 
-=== "SQLite"
+## 4. Run a query
 
-    ```python
-    import aiosqlite
-
-    from pysely import SqliteDialect
-
-    database = await aiosqlite.connect("app.db", isolation_level=None)
-    dialect = SqliteDialect(database=database)
-    ```
-
-=== "PostgreSQL"
-
-    ```python
-    import asyncpg
-
-    from pysely import PostgresDialect
-
-    pool = await asyncpg.create_pool("postgresql://user:password@localhost/app")
-    dialect = PostgresDialect(pool=pool)
-    ```
-
-=== "MySQL"
-
-    ```python
-    import asyncmy
-
-    from pysely import MysqlDialect
-
-    pool = await asyncmy.create_pool(
-        host="127.0.0.1",
-        user="app",
-        password="secret",
-        db="app",
-        autocommit=True,
-    )
-    dialect = MysqlDialect(pool=pool)
-    ```
-
-Create the connected client in your application’s `db.py`:
+Create `db.py` beside `dbschema.py`:
 
 ```python
+import asyncio
+
+import aiosqlite
+
+from pysely import SqliteDialect
 from dbschema import DatabaseSchema
 
 
-db = DatabaseSchema.connect(dialect=dialect)
-rows = await (
-    db.select_from("users")
-    .select("id")
-    .select("email")
-    .where("email", "=", "ada@example.com")
-    .execute()
-)
+async def main() -> None:
+    database = await aiosqlite.connect(":memory:", isolation_level=None)
+    dialect = SqliteDialect(database=database)
+
+    async with DatabaseSchema.connect(dialect=dialect) as db:
+        # Demo setup only; real applications manage their own migrations.
+        await database.execute(
+            "create table person (id integer primary key, first_name text not null)"
+        )
+        await database.execute(
+            "insert into person (id, first_name) values (?, ?)", (1, "Ada")
+        )
+
+        row = await (
+            db.select_from("person")
+            .select("id")
+            .select("first_name")
+            .where("first_name", "=", "Ada")
+            .execute_take_first_or_throw()
+        )
+        print(row.to_dict())
+
+
+asyncio.run(main())
 ```
 
-`rows[0]["id"]` is `int`, `rows[0]["email"]` is `str`, and `rows[0]["name"]`
-is an editor error, as is a misspelled column or a wrong value type. Chain one
-`.select()` per column; the list form compiles but reads keys as `object`.
+Run `python db.py` (or `uv run python db.py`):
 
-Pysely passes values to the driver separately from generated SQL.
+```text
+{'id': 1, 'first_name': 'Ada'}
+```
 
-### Without generation
+The `async with` block closes the database when it exits.
 
-Removing the stub does not change runtime behavior. The same handwritten
-schema and shared runtime still validate names and execute queries, but the
-schema-specific static checks are unavailable.
+## What the editor knows
+
+- `row["id"]` is `int`.
+- `row["first_name"]` is `str`.
+- An unselected key, misspelled column, or wrong filter value is a type error.
+
+Use one `.select()` per column for precise result types. The list form returns `object` values.
+
+## Next steps
+
+- [Queries](queries.md): filtering, joins, writes, and transactions.
+- [Schema and typing](typing.md): what is checked and what is not.
+- [Type generation](typgen.md): file layout, CI, and existing databases.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

@@ -1,87 +1,69 @@
-# Implementation roadmap
+# Roadmap
 
-The playground uses the public Python types and stock language-server results.
-It should match VS Code with equivalent settings. See [Project status](project-status.md)
-for currently available features.
+This is a direction, not a release schedule.
+See [Project status](project-status.md) for what works today.
 
-## Stage 1: Foundations
+## 1. Foundations — implemented
 
-- Package and CI
-- Immutable query tree and catalog types
-- Select compilation and portable typing
+- Immutable query builders and SQL compilation.
+- Driver bindings and bound parameters.
+- Packaging, linting, and type-checker CI.
 
-Status: complete.
+## 2. Database execution — implemented, expanding
 
-## Stage 2: Execution
+PostgreSQL (`asyncpg`), MySQL (`asyncmy`), and SQLite (`aiosqlite`) support
+async execution, transactions, and connection cleanup.
 
-- Driver and connection protocols, plugin pipeline, result types, and SQLite driver.
-- Async execution, resource providers, transactions, savepoints, and cleanup.
-- PostgreSQL and MySQL adapters with live CI wiring.
-- Add Psycopg 3 async and `psycopg_pool` support for PostgreSQL.
-- Add aiomysql support for MySQL and MariaDB.
+Additional driver targets:
 
-Status: PostgreSQL with asyncpg, MySQL with asyncmy, and SQLite with aiosqlite are
-complete. Psycopg 3 and aiomysql adapters are planned.
+- Psycopg 3 and `psycopg_pool`.
+- aiomysql, including MariaDB use cases.
 
-## Stage 3: SQL surface
+## 3. SQL and typing — in progress
 
-- Complete read and write builders, expressions, joins, CTEs, set operations, and DDL.
-- Add Kysely-style schema builders for creating, altering, and dropping tables,
-  columns, indexes, constraints, and schemas where the dialect supports them.
-- Capability checks and dialect helpers.
-- Schema-specific type interfaces using standard literals, overloads, and generic
-  scope, written by `pysely typgen` as one adjacent `.pyi` stub. Execution uses
-  the handwritten schema and shared runtime, with no generated runtime module.
+- Extend CTE, aggregate, and DDL support.
+- Add schema builders for tables, columns, indexes, and constraints.
+- Add schema-specific typing for string-based writes.
+- Reduce exact `select` overhead on large schemas.
 
-Status: in progress.
+Keep the existing chained query API and stock mypy/Pyright support.
+Type generation stays in adjacent `.pyi` files, not runtime modules.
 
-## Stage 4: Database lifecycle
+## 4. Database lifecycle — in progress
 
-- Add a Kysely-style migrator with ordered `up` and `down` migrations, migration
-  history, locking, rollback, and dialect-aware transactional behavior.
-- Apply schema changes through the same schema builders used outside migrations,
-  including table alterations.
-- Add PostgreSQL, MySQL, and SQLite introspection.
-- `pysely introspect`: scaffold a Python schema from a live database. This is a
-  separate, optional operation; `pysely typgen` then generates only its adjacent
-  type stub. Its `--check` mode checks stub freshness, not live database drift.
+Introspection already scaffolds Python schemas for PostgreSQL, MySQL, and SQLite.
 
-Exit: each primary dialect can be introspected, generated, migrated forward, and
-rolled back against a real database.
+Still planned:
 
-## Stage 5: Release hardening
+- Ordered `up` and `down` migrations.
+- Migration history, locking, and rollback.
+- Dialect-aware transactions for schema changes.
 
-- Streaming, cancellation, packaging matrix, documentation, and performance
-  baselines.
-- Add CI end-to-end coverage against an in-memory SQLite database for query
-  semantics, parameter safety, invalid-query handling, writes, and transactions.
-- Port every applicable Kysely test-suite behavior to Pysely and record intentional
-  Python or dialect differences in the parity ledger.
-- Close the parity ledger and production release gates.
+`typgen --check` only checks stub freshness. It is not a database migration
+or live-schema drift check.
 
-Status: planned.
+## 5. Release hardening — ongoing
 
-## Standard editor verification
+- Test cancellation, streaming, and failure cleanup.
+- Expand SQL behavior coverage against the Kysely parity ledger.
+- Measure runtime costs and editor latency.
+- Verify supported drivers, Python versions, and packaging.
 
-- Generate interfaces that work with Pylance, Pyright, and ordinary mypy without a
-  plugin or background watcher.
-- Use the stock local Pyright language server over stdio as the primary automated
-  editor contract. Expand those LSP tests for invalid tables, ambiguity, values,
-  writes, projections, aliases, nullable joins, helpers, and multiple schemas.
-- Keep browser automation focused on a small playground integration smoke suite;
-  do not duplicate the portable typing matrix in Playwright.
-- Verify representative behavior in VS Code/Pylance and PyCharm manually before
-  releases. A VS Code-hosted test harness is optional, not a release prerequisite.
-- Keep custom LSP and editor-extension work paused unless measured portable gaps
-  justify it after the core API and code generator stabilize.
+Existing CI tests are a foundation, not the final release gate.
 
-Browser playground completions must come from a real language service; simulated
-completion providers are not part of the product.
+## Editor commitments
 
-## Post-readiness dialect expansion
+- Use ordinary Python types with no required checker plugin.
+- Test stock Pyright completion and both checkers' diagnostics.
+- Keep playground diagnostics unchanged.
+- Verify VS Code/Pylance and PyCharm behavior before claiming support.
 
-- Add MSSQL and PGlite runtime adapters after the PostgreSQL, MySQL, and SQLite
-  production gates are complete.
+A browser-only workaround must not hide a limitation users will encounter locally.
+
+## Later database targets
+
+Add SQL Server and PGlite runtime adapters after the primary databases meet
+the production-readiness requirements.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

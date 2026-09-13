@@ -6,9 +6,9 @@
 # pyright: reportIncompatibleMethodOverride=false
 # pyright: reportOverlappingOverload=false
 from __future__ import annotations
-from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Generic, Literal, LiteralString, Never, TypeAlias, TypeVar, overload, Self, TypeVarTuple
+from typing import Literal, Generic, LiteralString, Never, TypeAlias, TypeVar, overload, Self, TypeVarTuple
+from collections.abc import Callable, Sequence
 from pysely import Dialect, Expression, ExpressionBuilder, OrderDirection, QueryPlugin, SchemaDefinition
 from pysely.flat_row import Field
 from pysely.schema_definition import QueryCore, SchemaClient
@@ -194,9 +194,6 @@ class DatabaseQuery(_Predicates[DatabaseExpressionBuilder[ColumnT, G0, G1, G2, G
     def select(self: _QueryScope[TablesT | Literal['person'], NullT], selections: Literal['person.first_name', 'first_name']) -> DatabaseQuery[TablesT | Literal['person'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[Literal['first_name'], str], *FieldsT]: ...
 
     @overload
-    def select(self: _QueryScope[TablesT | Literal['person'], NullT | Literal['person']], selections: Literal['person.last_name', 'last_name']) -> DatabaseQuery[TablesT | Literal['person'], ColumnT, NullT | Literal['person'], StarT, G0, G1, G2, G3, G4, G5, Field[Literal['last_name'], str | None], *FieldsT]: ...
-
-    @overload
     def select(self: _QueryScope[TablesT | Literal['person'], NullT], selections: Literal['person.last_name', 'last_name']) -> DatabaseQuery[TablesT | Literal['person'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[Literal['last_name'], str | None], *FieldsT]: ...
 
     @overload
@@ -228,9 +225,6 @@ class DatabaseQuery(_Predicates[DatabaseExpressionBuilder[ColumnT, G0, G1, G2, G
 
     @overload
     def select(self: _QueryScope[TablesT | Literal['pet'], NullT], selections: Literal['pet.species', 'species']) -> DatabaseQuery[TablesT | Literal['pet'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[Literal['species'], Literal['cat', 'dog', 'hamster']], *FieldsT]: ...
-
-    @overload
-    def select(self: _QueryScope[TablesT | Literal['pet'], NullT | Literal['pet']], selections: Literal['pet.born', 'born']) -> DatabaseQuery[TablesT | Literal['pet'], ColumnT, NullT | Literal['pet'], StarT, G0, G1, G2, G3, G4, G5, Field[Literal['born'], date | None], *FieldsT]: ...
 
     @overload
     def select(self: _QueryScope[TablesT | Literal['pet'], NullT], selections: Literal['pet.born', 'born']) -> DatabaseQuery[TablesT | Literal['pet'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[Literal['born'], date | None], *FieldsT]: ...
@@ -275,9 +269,6 @@ class DatabaseQuery(_Predicates[DatabaseExpressionBuilder[ColumnT, G0, G1, G2, G
     def select_as(self: _QueryScope[TablesT | Literal['person'], NullT], source: Literal['person.first_name', 'first_name'], alias: AliasT) -> DatabaseQuery[TablesT | Literal['person'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[AliasT, str], *FieldsT]: ...
 
     @overload
-    def select_as(self: _QueryScope[TablesT | Literal['person'], NullT | Literal['person']], source: Literal['person.last_name', 'last_name'], alias: AliasT) -> DatabaseQuery[TablesT | Literal['person'], ColumnT, NullT | Literal['person'], StarT, G0, G1, G2, G3, G4, G5, Field[AliasT, str | None], *FieldsT]: ...
-
-    @overload
     def select_as(self: _QueryScope[TablesT | Literal['person'], NullT], source: Literal['person.last_name', 'last_name'], alias: AliasT) -> DatabaseQuery[TablesT | Literal['person'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[AliasT, str | None], *FieldsT]: ...
 
     @overload
@@ -303,9 +294,6 @@ class DatabaseQuery(_Predicates[DatabaseExpressionBuilder[ColumnT, G0, G1, G2, G
 
     @overload
     def select_as(self: _QueryScope[TablesT | Literal['pet'], NullT], source: Literal['pet.species', 'species'], alias: AliasT) -> DatabaseQuery[TablesT | Literal['pet'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[AliasT, Literal['cat', 'dog', 'hamster']], *FieldsT]: ...
-
-    @overload
-    def select_as(self: _QueryScope[TablesT | Literal['pet'], NullT | Literal['pet']], source: Literal['pet.born', 'born'], alias: AliasT) -> DatabaseQuery[TablesT | Literal['pet'], ColumnT, NullT | Literal['pet'], StarT, G0, G1, G2, G3, G4, G5, Field[AliasT, date | None], *FieldsT]: ...
 
     @overload
     def select_as(self: _QueryScope[TablesT | Literal['pet'], NullT], source: Literal['pet.born', 'born'], alias: AliasT) -> DatabaseQuery[TablesT | Literal['pet'], ColumnT, NullT, StarT, G0, G1, G2, G3, G4, G5, Field[AliasT, date | None], *FieldsT]: ...

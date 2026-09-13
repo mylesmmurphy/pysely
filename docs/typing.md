@@ -1,153 +1,170 @@
 # Schema and typing
 
-Two layers, one source of truth:
+Pysely checks table names, column names, filter values, and selected result types.
+Generate a stub with [`pysely typgen`](typgen.md) to enable these checks.
 
-| Layer | Source | What it does |
-| --- | --- | --- |
-| Runtime | your table classes | validates table and column names when a query is built |
-| Static | `schema.pyi`, generated beside the handwritten schema | lets mypy and Pyright check queries and complete names |
-
-No checker plugin. Both checkers read ordinary annotations.
-
-## Runtime only
-
-```python
-class PersonTable:
-    id: int
-    first_name: str
-    status: Literal["active", "inactive"]
-
-
-class DatabaseSchema:
-    person: PersonTable
-
-
-db = Pysely(schema=DatabaseSchema, dialect=dialect)
-rows = await db.select_from("person").select("first_name").execute()
-```
-
-Unknown names raise `InvalidQueryError` at query-build time. Nothing is
-checked statically; rows are `dict[str, object]`.
-
-## Static checking
-
-Define your schema with `SchemaDefinition` as shown in [type generation](typgen.md),
-generate its stub, and import the handwritten schema normally:
-
-```bash
-pysely typgen schema.py
-```
-
-```python
-from schema import DatabaseSchema
-
-db = DatabaseSchema.connect(dialect=dialect)
-```
-
-Each line below is covered by a test that runs stock mypy 1.20 and Pyright
-1.1.413 against a freshly generated module (`test/typings`).
-
-| Capability | Status |
+| When | What runs |
 | --- | --- |
-| Table and column completion, in scope only | Verified |
-| Unknown, unjoined or ambiguous columns in `select`, `select_as`, `where`, `where_ref`, `group_by`, `having`, `order_by`, joins and callbacks | Error |
-| `where` values checked per operator family (see below); `having` takes the callback form | Verified |
-| Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | 64-field lookup capacity; 50-field mixed projections regression-tested |
-| `select_as` alias typed as a key; `order_by` accepts selected aliases | Verified for a literal alias (aliases: first 8 fields) |
-| Left join: the joined table's keys become `X \| None` | Verified |
-| Right and full join: every key becomes `X \| None` | Verified (conservative) |
-| `union`/`union_all`/`intersect`/`except_` require the same selected shape | Verified |
-| `.select([...])` lists | Scope-checked; every key of that row reads as `object` |
-| Typed string writes | Not yet |
-| Table aliases (`"person as p"`), CTEs | Runtime only / not yet |
+| In your editor or CI | mypy/Pyright reads `dbschema.pyi` |
+| When your app runs | Python reads `dbschema.py` and uses shared Pysely code |
+
+The stub is never imported by Python. No checker plugin is needed.
+
+## Exact result types
+
+“Exact” means the checker knows both the selected key and its value type.
+
+```python
+row = await (
+    db.select_from("person")
+    .select("id")
+    .execute_take_first_or_throw()
+)
+
+person_id = row["id"]  # int
+# row["first_name"]   # type error: not selected
+```
+
+Use one `select` call per column. With `select(["id", "first_name"])`,
+column names are checked, but result values are typed as `object`.
+
+## Column names and scope
+
+A column is “in scope” if its table is part of the query.
+
+- Before a join, `"id"` and `"person.id"` both work.
+- After a join, qualify names shared by multiple schema tables: `"person.id"`.
+- Columns from tables you have not joined are rejected.
+
+The static rule is conservative: after a join, a bare name must be unique in
+the whole schema, not just among the joined tables.
+
+## Aliases
+
+```python
+query = db.select_from("person").select_as("id", "person_id")
+```
+
+The result has a `"person_id"` key of type `int`.
+Use a literal alias; dynamic aliases have [checker-specific limits](#dynamic-aliases).
+
+The combined string `"id as person_id"` is supported at runtime, not for exact static typing.
+
+## Nullable values
+
+Declare a nullable column as `str | None`, `int | None`, or another optional type.
+
+| Join | Result typing |
+| --- | --- |
+| Inner | Keeps declared column types |
+| Left | Joined-table values may also be `None` |
+| Right or full | Every value may be `None` (conservative) |
+
+Use `where("column", "is", None)` for SQL `NULL`, not `= None`.
+See [filter operators](queries.md#filter-rows) for accepted values.
+
+## Working with rows
+
+Typed reads return `FlatRow`, an immutable mapping.
+
+- `row["id"]`: read a known key with its exact type.
+- `row.get("missing")`: unknown keys are allowed, as with ordinary mappings.
+- `row.to_dict()`: copy all fields into a `dict[str, object]`.
+
+Exact lookup covers the **64 most recent selections**. Use `to_dict()` for
+older fields. The regression suite checks every type in a mixed 50-field result.
+
+Avoid duplicate result names. Runtime validation rejects duplicate output names;
+static alias inference alone does not guarantee a valid SQL result.
+
+## Current limits
+
+| Feature | Boundary |
+| --- | --- |
+| String-based writes | No schema-specific static checking of keys or values yet |
+| Table aliases, such as `"person as p"` | Runtime only |
+| CTEs and aggregates | Not part of the complete typed string API yet |
+| Selected aliases in `order_by` | The 8 most recent selected fields |
+| `select_from(table)` with `table: str` | Rejected by the generated interface |
 | PyCharm | Not verified |
 
-## Names
+For dynamic table names, use `Pysely(schema=DatabaseSchema, dialect=dialect)`.
+That runtime-only path returns dictionary rows without schema-specific static checks.
 
-- A bare name works when only one table in the database declares it, or when
-  it is the only table in the query (`db.select_from("person").select("id")`).
-- After a join, a name two tables declare must be qualified: `person.id`.
-  The static rule is stricter than the runtime one in one case: a joined
-  query with a bare name that is unique in the *query* but not in the
-  database must still qualify it.
-- `.select_as("pet.name", "pet_name")` keeps the alias typed; the string form
-  `"pet.name as pet_name"` is runtime only.
+### Dynamic aliases
 
-## Operator families
+Prefer `select_as("id", "person_id")` over an alias computed at runtime.
 
-| Operators | Value |
-| --- | --- |
-| `=` `!=` `<>` `<` `<=` `>` `>=` | the column's type, without `None` |
-| `is` `is not` | `None` |
-| `like` `not like` | `str`, string columns only |
-| `in` `not in` | `list` or `tuple` of the column's type |
+- Pyright falls back to `object` values for a plain `str` alias.
+- mypy does not enforce `LiteralString` here and can infer keys too broadly.
+- A union alias such as `Literal["a", "b"]` exposes both keys statically,
+  although only one exists at runtime.
 
-The same rules apply inside `where(lambda eb: ...)`; `eb.and_`, `eb.or_`,
-`eb.not_` and `eb.ref` compose them.
+These are known limitations, not guarantees of full safety for dynamic aliases.
 
-## Rows
+### Editor messages and suggestions
 
-Typed queries return `pysely.FlatRow`: immutable mappings with a flat pack of
-`Field[key, value]` types, newest first. There is no nested cons-list limit.
-The shared row stub provides exact lookup for the 64 most recent selections;
-older keys must be accessed through `to_dict()` (they are not silently `Any`).
-`get()` permits unknown keys, as ordinary mappings do. Duplicate aliases use
-the latest field type; runtime duplicate-output validation remains unchanged.
+Enum suggestions may include values from unrelated columns. Invalid values still
+produce type errors in both checkers.
 
-## Query classes
+An invalid call can produce an error on the whole query chain as well as the
+argument. Pyright's `strict` mode may add “unknown type” errors on later calls.
 
-`select_from("person")` returns `PersonQuery`, which only carries that table's
-overloads, so single-table completions stay fast however large the schema.
-Predicates and callbacks share generic value-family signatures. Any join returns
-`DatabaseQuery`; exact `select` still carries per-column overloads, so its
-completion latency grows with the total column count (see
-[Performance](#performance)).
+The playground uses Pyright `standard` mode. Choose the same mode in Pylance
+for comparable diagnostics; Pysely does not filter them.
 
-Enum value completions can include values from other schema columns, even on
-single-table queries. Invalid values still produce mypy/Pyright errors.
+## Advanced: query helpers
 
-## Known boundaries
+Generated query class names exist only in the stub. Use postponed annotations
+and import these names under `TYPE_CHECKING`.
 
-Each has a reproducer in `test/typings`.
+```python
+from __future__ import annotations
 
-- **Whole-chain diagnostic.** Every typed method is an overload set, and both
-  checkers report "No overloads match" on the full call expression. Pyright
-  adds the argument-level error beside it. Pyright's `strict` mode also
-  cascades "type of X is unknown" errors down the chain; the playground uses
-  `standard`, which does not. Pick `standard` in Pylance to match.
-- **Value suggestions after a join are a superset.** Pyright unions the value
-  literals of every overload whose receiver matches, so an editor may offer
-  `pet` enum values at a `person` column. Wrong values are still errors.
-- **Non-literal aliases.** Under Pyright a `str` alias makes the row's keys
-  read as `object`. mypy has no `LiteralString`, so it treats a `str` alias as
-  a literal and types every key as that column. A union alias
-  (`Literal["a", "b"]`) types both keys under both checkers although only one
-  exists.
-- **List projections** keep scope checks but cannot capture keys: mypy infers
-  `list[str]` for a list literal.
-- **Dynamic table names** (`select_from(table)` with `table: str`) are a
-  static error; use the untyped `Pysely` client for those.
-- **Helpers** can preserve the flat pack using `TypeVarTuple` and
-  `PersonQuery[*FieldsT]`. Generated query class names are type-only: import
-  them under `TYPE_CHECKING` and use postponed annotations.
-- **Wide rows** have exact lookup capacity for 64 selections. The regression
-  suite checks every key and type in a mixed 50-column projection.
+from typing import TYPE_CHECKING, TypeVarTuple
+
+if TYPE_CHECKING:
+    from dbschema import PersonQuery
+
+FieldsT = TypeVarTuple("FieldsT")
+
+
+def first_ten(query: PersonQuery[*FieldsT]) -> PersonQuery[*FieldsT]:
+    return query.limit(10)
+```
+
+The field pack preserves the caller's selected keys and types.
+Do not instantiate generated query classes or use them with `isinstance`.
 
 ## Performance
 
-The stub backend still has a real bottleneck: exact `select` overloads.
-On the representative 20-table/333-column schema, the September 12 local run
-produced a 582,755-byte stub (previous output was about 1.3 MB). Three edit rounds
-gave median select completion times of 106 ms single-table, 715 ms with two
-tables, and 1,070 ms with three. Cold checks across the benchmark's query/projection
-fixtures took 6.16 s in Pyright and 53.18 s in mypy; warm mypy took 0.26 s.
-These are local measurements, not latency guarantees.
+The stub can still be large. That costs editor and type-checker time, not runtime imports.
 
-Predicates now share one overload family per schema value type. Result fields
-are flat rather than recursively nested. Neither change eliminates the
-per-column exact projection work; optimizing that remains separate.
-Reproduce with `uv run python scripts/benchmark_typing.py --tables 20 --rounds 3`.
-Historical measurements in ADR 0006 describe the old backend.
+Local measurements from September 12, 2026: 20 tables, 333 columns, five edit rounds.
+
+| Measurement | Result |
+| --- | --- |
+| Stub size | 557,334 bytes; 581,860 before this optimization pass |
+| Generation time | 1.55 seconds |
+| Median single-table select completion | 75 ms |
+| Median select completion, two / three tables | 593 / 962 ms |
+| Cold Pyright / mypy checks | 3.60 / 45.12 seconds |
+| Warm mypy check | 0.24 seconds |
+
+These are local results, not latency guarantees. Exact `select` still needs
+column-specific overloads and remains the main scaling bottleneck.
+
+Shared predicate generics reduce duplication. Flat field packs replace nested
+result types. Already-nullable columns now avoid redundant overloads, and the
+generator emits stub signatures directly. Exact projections still need per-column work.
+
+Reproduce the benchmark:
+
+```bash
+uv run python scripts/benchmark_typing.py --tables 20 --rounds 5
+```
+
+See [the design decision](adr/0007-type-only-typgen.md) for implementation details.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

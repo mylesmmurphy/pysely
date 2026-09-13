@@ -1,35 +1,38 @@
 # Project status
 
-Pysely is under active development and is not production-ready.
+Pysely is pre-alpha and **not production-ready**. APIs may change.
 
-## Implemented
+## Available now
 
-- Immutable query nodes and builders
-- Annotated database schemas and string-based reads and writes
-- `pysely typgen`: one adjacent `.pyi` type stub per handwritten schema, with a
-  `--check` freshness gate; no generated runtime module
-- Static checking in mypy and Pyright with no checker plugin
-- Three-pane playground with Pysely compilation and Pyright language intelligence
-- PostgreSQL, MySQL, and SQLite compilation and async execution
-- Select, insert, update, and delete
-- Inner, left, right and full joins with nullability typing
-- Ordering, limit/offset, group by/having, and union/intersect/except
-- Bound predicates per operator family, aliases, returning projections, and
-  result metadata; per-key typed result rows
-- Transactions and single-connection scopes
-- PostgreSQL, MySQL, and SQLite introspection to scaffold schema declarations
-- Ordered query and result plugins
-- Ruff, mypy, Pyright, package, and live database CI gates
+| Area | Implemented |
+| --- | --- |
+| Databases | Async PostgreSQL, MySQL, and SQLite execution |
+| Reads | Select, filters, joins, aliases, ordering, paging, grouping, set operations |
+| Writes | Insert, update, delete, and supported returning clauses |
+| Connections | Transactions, single-connection scopes, and cleanup |
+| Typing | mypy/Pyright checks from adjacent `.pyi` stubs |
+| Tooling | Schema introspection and an interactive browser playground |
 
-## In progress
+`typgen` generates no runtime module. SQL execution uses shared library code.
 
-- CTEs, aggregates, DDL, and the broader Kysely SQL surface
-- Typed string writes on generated clients
-- Failure-path, cancellation, and lifecycle hardening
-- Schema builders, migrations, type-generation scaling, and streaming
-- Browser language-server lifecycle, performance, and cross-browser test coverage
+## Know the boundaries
 
-MSSQL and PGlite runtime adapters are post-readiness work.
+- String-based writes do not yet have schema-specific static checking.
+- Exact result types have limits for wide rows, lists, and dynamic aliases.
+- CTEs, aggregates, and DDL are not a complete typed SQL surface.
+- SQL Server and PGlite currently support offline compilation, not execution.
+
+See [Schema and typing](typing.md#current-limits) for precise typing boundaries.
+
+## Before a production release
+
+- Complete the supported SQL and migration APIs.
+- Harden cancellation, failures, and resource cleanup.
+- Improve large-schema type-checking and completion speed.
+- Expand parity, runtime, and editor verification.
+
+CI already covers Ruff, mypy, Pyright, packaging, live databases, and browser tests.
+Passing those checks is not a production-readiness claim.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

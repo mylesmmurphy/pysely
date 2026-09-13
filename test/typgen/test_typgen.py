@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -247,3 +249,98 @@ def test_single_table_schema_has_valid_overloads(tmp_path: Path) -> None:
     (tmp_path / "dbschema.py").write_text(source)
     (tmp_path / "dbschema.pyi").write_text(generate(source))
     check_both(tmp_path, "dbschema.pyi")
+
+
+def test_nullable_projection_keeps_scope_and_later_join_state(tmp_path: Path) -> None:
+    source = "from pysely import SchemaDefinition\n"
+    for table in ("A", "B", "C", "D"):
+        source += f"class {table}:\n    id: int\n    optional: str | None\n"
+    source += "class DB(SchemaDefinition):\n    a: A\n    b: B\n    c: C\n    d: D\n"
+    (tmp_path / "dbschema.py").write_text(source)
+    stub = generate(source)
+    (tmp_path / "dbschema.pyi").write_text(stub)
+    tree = ast.parse(stub)
+    joined = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "DatabaseQuery"
+    )
+    # Four nullable columns each contribute one select, not two.
+    methods = [node for node in joined.body if isinstance(node, ast.FunctionDef)]
+    assert sum(node.name == "select" for node in methods) == 13
+    setup = (
+        "from typing import assert_type\nfrom dbschema import DB\n"
+        "from pysely import Dialect\n"
+        "from pysely.query_compiler import BindingProfile\n"
+        'db = DB.connect(dialect=Dialect(BindingProfile("test", "?")))\n'
+    )
+    positive = setup
+    negative = setup.replace("from typing import assert_type\n", "")
+    for kind in ("inner", "left", "right", "full"):
+        chain = (
+            f'db.select_from("a").{kind}_join("b", "a.id", "b.id")'
+            '.select("a.optional").select_as("b.optional", "b_optional")'
+        )
+        left = "int | None" if kind in {"right", "full"} else "int"
+        right = "int" if kind == "inner" else "int | None"
+        positive += (
+            f"async def {kind}() -> None:\n    query = {chain}\n"
+            '    query = query.where(lambda eb: eb("b.id", ">", 0))\n'
+            '    row = await (query.inner_join("c", "a.id", "c.id")'
+            '.select_as("a.id", "a_id").select_as("b.id", "b_id")'
+            '.select_as("c.id", "c_id").execute_take_first_or_throw())\n'
+            '    assert_type(row["optional"], str | None)\n'
+            '    assert_type(row["b_optional"], str | None)\n'
+            f'    assert_type(row["a_id"], {left})\n'
+            f'    assert_type(row["b_id"], {right})\n'
+            f'    assert_type(row["c_id"], {left})\n'
+        )
+        negative += (
+            f"async def invalid_{kind}() -> None:\n"
+            f"    query = {chain}\n"
+            '    query.select("c.optional")  # error\n'
+            '    query.select_as("c.optional", "c")  # error\n'
+            '    query.select("optional")  # error\n'
+            '    query.select("c.id")  # error\n'
+            '    query.where("b.id", "=", "bad")  # error\n'
+            "    row = await query.execute_take_first_or_throw()\n"
+            '    row["missing"]  # error\n'
+        )
+    (tmp_path / "usage.py").write_text(positive)
+    check_both(tmp_path, "usage.py")
+    check_both(tmp_path, "dbschema.pyi")
+    invalid = tmp_path / "invalid.py"
+    invalid.write_text(negative)
+    expected = {
+        line
+        for line, text in enumerate(negative.splitlines(), 1)
+        if text.endswith("# error")
+    }
+    for checker in ("pyright", "mypy"):
+        args = (
+            ["pyright", "--outputjson", "invalid.py"]
+            if checker == "pyright"
+            else [sys.executable, "-m", "mypy", "--strict", "invalid.py"]
+        )
+        result = subprocess.run(
+            args,
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "MYPYPATH": str(ROOT / "src")},
+        )
+        if checker == "pyright":
+            errors = {
+                item["range"]["start"]["line"] + 1
+                for item in json.loads(result.stdout)["generalDiagnostics"]
+                if item["severity"] == "error"
+            }
+        else:
+            errors = {
+                int(line)
+                for line in re.findall(
+                    r"^invalid.py:(\d+): error:", result.stdout, re.M
+                )
+            }
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert errors == expected, result.stdout
