@@ -6,13 +6,13 @@ same example against the real Pysely package.
 
 ## Generated schema
 
-`workspace/schema.py` is what `pysely codegen` writes for the tables editor's
+`workspace/schema.pyi` is what `pysely typgen` writes for the tables editor's
 contents. The Pyodide worker regenerates it on every run and pushes it to
 Pyright, so a column added in the tables pane is usable in the query pane at
 once. When the tables do not parse, Pyright keeps the last good module and the
-schema.py tab says so. The committed `docs/assets/examples/schema.py` is only
-the starting state; regenerate it with `pysely codegen
-docs/assets/examples/tables.py --output docs/assets/examples/schema.py`. CI
+schema.pyi tab says so. The committed `docs/assets/examples/schema.pyi` is only
+the starting state; regenerate it with `pysely typgen
+docs/assets/examples/schema.py --output docs/assets/examples/schema.pyi`. CI
 fails when it drifts.
 
 Pyright runs in `standard` mode, its default. `strict` adds unknown-type

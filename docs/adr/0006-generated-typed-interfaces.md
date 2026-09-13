@@ -2,6 +2,9 @@
 
 Status: accepted. Supersedes the mypy plugin in [ADR 0003](0003-portable-typing.md).
 
+Superseded by [ADR 0007](0007-type-only-typgen.md). Measurements below describe
+the previous implementation, not the current stub backend.
+
 ## Context
 
 Python has no `keyof` or mapped types, so a checker can only see

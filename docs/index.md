@@ -19,9 +19,10 @@ rows = await (
 )
 ```
 
-Types come from one generated module — `pysely codegen tables.py --output
-schema.py` — checked by mypy and Pyright with no plugin. See
-[Code generation](codegen.md).
+`pysely typgen dbschema.py` generates only `dbschema.pyi`, which mypy and Pyright
+read without a plugin. **No massive runtime file is generated.** Python runs your
+handwritten schema and the shared library; it never loads the stub. See
+[Type generation](typgen.md).
 
 ## Current database support
 

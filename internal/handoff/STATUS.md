@@ -29,18 +29,17 @@ Current stage: 3 - SQL surface
 - Single-connection scopes and rollback after transaction body or commit failure.
 - Parenthesized boolean groups and basic column-reference comparisons.
 - Annotated database schemas, string read queries, inner joins, and aliases.
-- `pysely codegen` writes one self-contained typed module (table classes,
-  `schema`, one query class per table, a generic joined-query class) from
-  annotated table classes, with a `--check` drift gate in CI and a published
-  pre-commit hook (ADR 0006). The `pysely.mypy` plugin was removed; generated
-  source serves both checkers.
-- Result rows are `pysely.Row[FieldsT, StarT]` cons lists with per-key value
-  types (16 typed fields); scope-aware `select`/`select_as`/`where`/joins/
+- `pysely typgen` writes only an adjacent `.pyi` for a handwritten schema,
+  with a `--check` freshness gate and a published pre-commit hook (ADR 0007).
+  Python runs the handwritten `SchemaDefinition` subclass and shared runtime;
+  no generated runtime file or checker plugin is required.
+- Result rows are flat `pysely.FlatRow` field packs with per-key value
+  types (64 lookup positions, 50-field regressions); scope-aware `select`/`select_as`/`where`/joins/
   callbacks; bare shared names accepted only while their table is alone;
   left/right/full join nullability; operator value families; order_by
   (columns and selected aliases), limit/offset, group_by, having (callback),
   union/union_all/intersect/except_.
-- `pysely introspect` writes `tables.py` from SQLite, PostgreSQL or MySQL
+- `pysely introspect` scaffolds a Python schema from SQLite, PostgreSQL or MySQL
   catalogs (types, nullability, enums, key/default comments, overrides).
 - Thread-safe query compilation: a shared compiler no longer keeps bound
   parameters on the instance across concurrent calls.

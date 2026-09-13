@@ -4,13 +4,7 @@ from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import (
-    Any,
-    ClassVar,
-    Generic,
-    TypeVar,
     cast,
-    get_args,
-    get_origin,
     get_type_hints,
 )
 
@@ -31,24 +25,6 @@ COMPARISON_OPERATORS = frozenset({"=", "!=", "<>", "<", "<=", ">", ">="})
 NULL_OPERATORS = frozenset({"is", "is not"})
 PATTERN_OPERATORS = frozenset({"like", "not like"})
 COLLECTION_OPERATORS = frozenset({"in", "not in"})
-
-ClientT = TypeVar("ClientT")
-
-
-class GeneratedSchema(Generic[ClientT]):
-    """Base class `pysely codegen` gives a schema class.
-
-    The type argument names the typed client for that schema, which is how
-    `Database(schema=...)` knows what to build and what to return.
-    """
-
-    __pysely_client__: ClassVar[type[Any]]
-
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        super().__init_subclass__(**kwargs)
-        for base in getattr(cls, "__orig_bases__", ()):
-            if get_origin(base) is GeneratedSchema:
-                cls.__pysely_client__ = get_args(base)[0]
 
 
 def split_alias(value: str) -> tuple[str, str]:

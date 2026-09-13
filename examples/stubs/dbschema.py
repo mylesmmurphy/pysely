@@ -1,20 +1,15 @@
-from typing import Literal
-
 from pysely import SchemaDefinition
 
 
 class PersonTable:
     id: int
-    first_name: str
-    last_name: str | None
-    status: Literal["active", "inactive"]
+    name: str
 
 
 class PetTable:
     id: int
     owner_id: int
     name: str
-    species: Literal["cat", "dog", "hamster"]
 
 
 class DatabaseSchema(SchemaDefinition):

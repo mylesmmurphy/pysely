@@ -8,12 +8,21 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from pysely.codegen import SchemaError, generate
+from pysely.typgen import SchemaError, generate
 
 
-def _codegen(arguments: argparse.Namespace) -> int:
+def _typgen(arguments: argparse.Namespace) -> int:
     schema: Path = arguments.schema
-    output: Path = arguments.output
+    output: Path = arguments.output or schema.with_suffix(".pyi")
+    if (
+        schema.suffix != ".py"
+        or output.resolve() != schema.with_suffix(".pyi").resolve()
+    ):
+        print(
+            "pysely: output must be the adjacent .pyi for the input .py schema",
+            file=sys.stderr,
+        )
+        return 2
     try:
         source = schema.read_text()
     except OSError as error:
@@ -31,7 +40,7 @@ def _codegen(arguments: argparse.Namespace) -> int:
             return 0
         reason = "is out of date" if current is not None else "does not exist"
         print(
-            f"pysely: {output} {reason}; run `pysely codegen "
+            f"pysely: {output} {reason}; run `pysely typgen "
             f"{schema} --output {output}`",
             file=sys.stderr,
         )
@@ -103,21 +112,18 @@ def _mysql_options(url: str) -> dict[str, object]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pysely")
     commands = parser.add_subparsers(dest="command", required=True)
-    codegen = commands.add_parser(
-        "codegen",
-        help=(
-            "write one self-contained typed schema module from annotated table classes"
-        ),
+    typgen = commands.add_parser(
+        "typgen",
+        help="write an adjacent type stub for a handwritten schema",
     )
-    codegen.add_argument("schema", type=Path, help="module containing table classes")
-    codegen.add_argument(
+    typgen.add_argument("schema", type=Path, help="module containing table classes")
+    typgen.add_argument(
         "-o",
         "--output",
         type=Path,
-        required=True,
-        help="module to write; import `schema` from it and nothing else",
+        help="adjacent .pyi output (defaults to the schema path with .pyi suffix)",
     )
-    codegen.add_argument(
+    typgen.add_argument(
         "--check",
         action="store_true",
         help="exit non-zero when the output is missing or out of date",
@@ -156,8 +162,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="what to do with a SQL type that has no Python mapping",
     )
     arguments = parser.parse_args(argv)
-    if arguments.command == "codegen":
-        return _codegen(arguments)
+    if arguments.command == "typgen":
+        return _typgen(arguments)
     if arguments.command == "introspect":
         return _introspect(arguments)
     parser.error(f"unknown command: {arguments.command}")  # pragma: no cover

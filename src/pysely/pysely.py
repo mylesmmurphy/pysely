@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import TracebackType
-from typing import Any, Generic, TypeVar, overload
+from typing import Generic, TypeVar, overload
 
 from pysely.catalog import Table
 from pysely.dialect import Dialect
@@ -26,11 +26,10 @@ from pysely.query_builder.write_query_builder import (
     create_update_builder,
 )
 from pysely.query_executor import QueryExecutor, QueryPlugin
-from pysely.schema import GeneratedSchema, Schema
+from pysely.schema import Schema
 
 DatabaseT = TypeVar("DatabaseT")
 SchemaT = TypeVar("SchemaT")
-ClientT = TypeVar("ClientT")
 RowT = TypeVar("RowT")
 InsertT = TypeVar("InsertT")
 UpdateT = TypeVar("UpdateT")
@@ -233,37 +232,11 @@ class ConnectionContext(Generic[DatabaseT]):
             self._connection = None
 
 
-@overload
-def Database(  # type: ignore[overload-overlap]
-    *,
-    schema: type[GeneratedSchema[ClientT]],
-    dialect: Dialect,
-    plugins: tuple[QueryPlugin, ...] = (),
-) -> ClientT: ...
-
-
-@overload
 def Database(
     *,
     schema: type[SchemaT],
     dialect: Dialect,
     plugins: tuple[QueryPlugin, ...] = (),
-) -> Pysely[SchemaT]: ...
-
-
-def Database(
-    *,
-    schema: type[Any],
-    dialect: Dialect,
-    plugins: tuple[QueryPlugin, ...] = (),
-) -> Any:
-    """Build a client for a schema.
-
-    A schema written by `pysely codegen` names its typed client, and that
-    client is returned. Any other annotated schema gets a plain `Pysely` with
-    runtime validation only.
-    """
-    client = getattr(schema, "__pysely_client__", None)
-    if client is not None:
-        return client(dialect=dialect, schema=schema, plugins=plugins)
-    return Pysely(dialect=dialect, schema=schema, plugins=plugins)
+) -> Pysely[SchemaT]:
+    """Build a plain runtime-validated client. Typed schemas use .connect()."""
+    return Pysely(schema=schema, dialect=dialect, plugins=plugins)

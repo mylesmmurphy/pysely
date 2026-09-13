@@ -29,8 +29,9 @@ complete. Psycopg 3 and aiomysql adapters are planned.
 - Add Kysely-style schema builders for creating, altering, and dropping tables,
   columns, indexes, constraints, and schemas where the dialect supports them.
 - Capability checks and dialect helpers.
-- Generated schema-specific clients using standard literals, overloads, and generic
-  scope, written by `pysely codegen` as one self-contained module.
+- Schema-specific type interfaces using standard literals, overloads, and generic
+  scope, written by `pysely typgen` as one adjacent `.pyi` stub. Execution uses
+  the handwritten schema and shared runtime, with no generated runtime module.
 
 Status: in progress.
 
@@ -41,8 +42,9 @@ Status: in progress.
 - Apply schema changes through the same schema builders used outside migrations,
   including table alterations.
 - Add PostgreSQL, MySQL, and SQLite introspection.
-- `pysely introspect`: write the same single generated module `pysely codegen`
-  produces, directly from a live database, reusing its `--check` drift mode.
+- `pysely introspect`: scaffold a Python schema from a live database. This is a
+  separate, optional operation; `pysely typgen` then generates only its adjacent
+  type stub. Its `--check` mode checks stub freshness, not live database drift.
 
 Exit: each primary dialect can be introspected, generated, migrated forward, and
 rolled back against a real database.

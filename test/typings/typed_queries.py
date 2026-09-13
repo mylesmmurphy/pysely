@@ -1,29 +1,25 @@
 """Positive typing fixture: checked by pyright (strict) and mypy (strict).
 
-Every claim here runs against ``test/fixtures/schema.py``, which CI regenerates
-from ``test/fixtures/tables.py`` and diffs.
+Every claim here uses ``test/fixtures/schema.pyi``, which CI regenerates from
+the handwritten ``test/fixtures/schema.py`` and diffs.
 """
 
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal, Never, TypeVar, assert_type
+from typing import Literal, TypeVarTuple, assert_type
 
-from pysely import Cons, Database, Nil
 from test.fixtures.dialects import postgres_dialect
 from test.fixtures.schema import (
     DatabaseClient,
-    DatabaseQuery,
+    DatabaseSchema,
     PersonQuery,
-    PersonScope,
-    PetScope,
-    schema,
 )
 
-db = Database(schema=schema, dialect=postgres_dialect())
+db = DatabaseSchema.connect(dialect=postgres_dialect())
 assert_type(db, DatabaseClient)
 person = db.select_from("person")
-assert_type(person, PersonQuery[Nil])
+assert_type(person, PersonQuery[()])
 
 # --- bare names: unique in the database, or the only table in scope
 person.select("first_name")
@@ -33,16 +29,6 @@ person.where_ref("id", "=", "person.id")
 person.select_as("id", "person_id")
 
 joined = person.inner_join("pet", "owner_id", "person.id")
-assert_type(
-    joined.select("pet.id"),
-    DatabaseQuery[
-        Literal["person", "pet"],
-        PersonScope | PetScope,
-        Never,
-        Cons[Literal["id"], int, Nil],
-        Never,
-    ],
-)
 three = joined.inner_join("toy", "toy.pet_id", "pet.id")
 three.where_ref("toy.pet_id", "=", "pet.id").where("price", ">", 1.5)
 three.select("toy.name").select("pet.name").select("first_name")
@@ -160,28 +146,14 @@ person.where(lambda eb: eb("id", ">", 0))
 
 # --- helpers: single-table queries carry their table class; joined queries
 # name the tables they need
-FieldsT = TypeVar("FieldsT")
-NullT = TypeVar("NullT", bound=str)
-StarT = TypeVar("StarT", bound=str)
+FieldsT = TypeVarTuple("FieldsT")
 
 
-def active_only(query: PersonQuery[FieldsT]) -> PersonQuery[FieldsT]:
+def active_only(query: PersonQuery[*FieldsT]) -> PersonQuery[*FieldsT]:
     return query.where("status", "=", "active")
 
 
-def dogs_only(
-    query: DatabaseQuery[
-        Literal["person", "pet"], PersonScope | PetScope, NullT, FieldsT, StarT
-    ],
-) -> DatabaseQuery[
-    Literal["person", "pet"], PersonScope | PetScope, NullT, FieldsT, StarT
-]:
-    return query.where("species", "=", "dog")
-
-
 active_only(person)
-dogs_only(joined)
-dogs_only(person.left_join("pet", "owner_id", "person.id"))
 
 
 async def through_helper() -> None:

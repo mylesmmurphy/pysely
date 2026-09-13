@@ -1,23 +1,26 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import aiosqlite
 import pytest
 
 from pysely import (
-    Database as make_database,
-)
-from pysely import (
     InvalidQueryError,
     MysqlDialect,
     PostgresDialect,
     Pysely,
-    Row,
     SqliteDialect,
     UnsupportedFeatureError,
 )
+from pysely.flat_row import FlatRow
 from pysely.operation_node import OperationNodeTransformer, OperationNodeVisitor
 from test.fixtures.dialects import _unavailable_database
-from test.fixtures.schema import DatabaseClient, schema
+from test.fixtures.schema import DatabaseSchema
+
+if TYPE_CHECKING:
+    from test.fixtures.schema import DatabaseClient
 
 
 class PersonTable:
@@ -82,9 +85,7 @@ def test_select_as_quotes_dynamic_and_duplicate_aliases() -> None:
 
 
 def generated() -> DatabaseClient:
-    return make_database(
-        schema=schema, dialect=PostgresDialect(pool=_unavailable_database)
-    )
+    return DatabaseSchema.connect(dialect=PostgresDialect(pool=_unavailable_database))
 
 
 def test_generated_query_wrapper_uses_runtime_builder() -> None:
@@ -177,7 +178,7 @@ def test_join_kinds_compile_and_respect_dialect_support() -> None:
         )
 
     postgres = Pysely(
-        schema=schema, dialect=PostgresDialect(pool=_unavailable_database)
+        schema=DatabaseSchema, dialect=PostgresDialect(pool=_unavailable_database)
     )
     assert joined(postgres) == (
         'select "first_name" from "person" '
@@ -192,7 +193,9 @@ def test_join_kinds_compile_and_respect_dialect_support() -> None:
         .sql
     )
     assert 'left join "pet"' in left and 'right join "toy"' in left
-    mysql = Pysely(schema=schema, dialect=MysqlDialect(pool=_unavailable_database))
+    mysql = Pysely(
+        schema=DatabaseSchema, dialect=MysqlDialect(pool=_unavailable_database)
+    )
     with pytest.raises(UnsupportedFeatureError, match="full joins"):
         joined(mysql)
 
@@ -228,9 +231,7 @@ SQLITE_FIXTURE = (
 async def test_typed_client_returns_generated_rows(tmp_path: Path) -> None:
     database = await aiosqlite.connect(tmp_path / "typed.db", isolation_level=None)
     await database.executescript(SQLITE_FIXTURE)
-    async with make_database(
-        schema=schema, dialect=SqliteDialect(database=database)
-    ) as db:
+    async with DatabaseSchema.connect(dialect=SqliteDialect(database=database)) as db:
         query = (
             db.select_from("person")
             .where("status", "=", "active")
@@ -242,8 +243,8 @@ async def test_typed_client_returns_generated_rows(tmp_path: Path) -> None:
         rows = await query.execute()
         first = await query.execute_take_first()
         only = await query.execute_take_first_or_throw()
-    assert [type(row) for row in rows] == [Row]
-    assert isinstance(only, Row) and first == only
+    assert [type(row) for row in rows] == [FlatRow]
+    assert isinstance(only, FlatRow) and first == only
     row = rows[0]
     assert (
         row["id"] == 1
@@ -270,19 +271,49 @@ async def test_typed_client_returns_generated_rows(tmp_path: Path) -> None:
         "last_name": None,
         "given": "Jennifer",
     }
-    assert repr(row).startswith("Row({")
+    assert repr(row).startswith("FlatRow({")
     with pytest.raises(KeyError):
         row["missing"]
     with pytest.raises(TypeError):
         row["id"] = 2  # type: ignore[index]
 
 
+async def test_stub_client_transaction_and_connection_preserve_runtime(
+    tmp_path: Path,
+) -> None:
+    database = await aiosqlite.connect(tmp_path / "stub-tx.db", isolation_level=None)
+    await database.executescript(SQLITE_FIXTURE)
+    async with DatabaseSchema.connect(dialect=SqliteDialect(database=database)) as db:
+        with pytest.raises(RuntimeError, match="rollback"):
+            async with db.transaction() as tx:
+                await (
+                    tx.update_table("person")
+                    .set({"first_name": "Changed"})
+                    .where("id", "=", 1)
+                    .execute()
+                )
+                row = (
+                    await tx.select_from("person")
+                    .where("id", "=", 1)
+                    .select("first_name")
+                    .execute_take_first_or_throw()
+                )
+                assert isinstance(row, FlatRow) and row["first_name"] == "Changed"
+                raise RuntimeError("rollback")
+        async with db.connection() as conn:
+            row = (
+                await conn.select_from("person")
+                .where("id", "=", 1)
+                .select("first_name")
+                .execute_take_first_or_throw()
+            )
+            assert isinstance(row, FlatRow) and row["first_name"] == "Jennifer"
+
+
 async def test_outer_joins_return_null_for_unmatched_rows(tmp_path: Path) -> None:
     database = await aiosqlite.connect(tmp_path / "joins.db", isolation_level=None)
     await database.executescript(SQLITE_FIXTURE)
-    async with make_database(
-        schema=schema, dialect=SqliteDialect(database=database)
-    ) as db:
+    async with DatabaseSchema.connect(dialect=SqliteDialect(database=database)) as db:
         left = await (
             db.select_from("person")
             .left_join("pet", "owner_id", "person.id")
@@ -401,7 +432,7 @@ def test_ordering_paging_grouping_and_set_operations_compile() -> None:
 def test_limit_styles_follow_the_dialect() -> None:
     from pysely import MssqlDialect
 
-    mssql = Pysely(schema=schema, dialect=MssqlDialect())
+    mssql = Pysely(schema=DatabaseSchema, dialect=MssqlDialect())
     paged = mssql.select_from("person").select("first_name").order_by("first_name")
     assert paged.limit(5).offset(10).compile().sql == (
         "select [first_name] from [person] order by [first_name] asc "
@@ -414,9 +445,7 @@ def test_limit_styles_follow_the_dialect() -> None:
 async def test_ordering_paging_and_set_operations_execute(tmp_path: Path) -> None:
     database = await aiosqlite.connect(tmp_path / "order.db", isolation_level=None)
     await database.executescript(SQLITE_FIXTURE)
-    async with make_database(
-        schema=schema, dialect=SqliteDialect(database=database)
-    ) as db:
+    async with DatabaseSchema.connect(dialect=SqliteDialect(database=database)) as db:
         person = db.select_from("person")
         ordered = (
             await person.select("first_name").order_by("first_name", "desc").execute()

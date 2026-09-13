@@ -6,8 +6,8 @@ Pysely is under active development and is not production-ready.
 
 - Immutable query nodes and builders
 - Annotated database schemas and string-based reads and writes
-- `pysely codegen`: one self-contained typed module per schema, with a
-  `--check` drift gate
+- `pysely typgen`: one adjacent `.pyi` type stub per handwritten schema, with a
+  `--check` freshness gate; no generated runtime module
 - Static checking in mypy and Pyright with no checker plugin
 - Three-pane playground with Pysely compilation and Pyright language intelligence
 - PostgreSQL, MySQL, and SQLite compilation and async execution
@@ -17,6 +17,7 @@ Pysely is under active development and is not production-ready.
 - Bound predicates per operator family, aliases, returning projections, and
   result metadata; per-key typed result rows
 - Transactions and single-connection scopes
+- PostgreSQL, MySQL, and SQLite introspection to scaffold schema declarations
 - Ordered query and result plugins
 - Ruff, mypy, Pyright, package, and live database CI gates
 
@@ -25,7 +26,7 @@ Pysely is under active development and is not production-ready.
 - CTEs, aggregates, DDL, and the broader Kysely SQL surface
 - Typed string writes on generated clients
 - Failure-path, cancellation, and lifecycle hardening
-- Schema builders, migrations, introspection, generation, and streaming
+- Schema builders, migrations, type-generation scaling, and streaming
 - Browser language-server lifecycle, performance, and cross-browser test coverage
 
 MSSQL and PGlite runtime adapters are post-readiness work.

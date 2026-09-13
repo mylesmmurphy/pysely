@@ -1,5 +1,11 @@
 # Pysely: Production Architecture and Codex Agent Handoff
 
+> Historical design document. For current type generation, follow
+> [ADR 0007](../../docs/adr/0007-type-only-typgen.md) and
+> [Type generation](../../docs/typgen.md): `pysely typgen` emits only an adjacent
+> `.pyi`. The old `codegen` command, generated runtime modules, and nested result
+> rows below are superseded, not compatibility requirements.
+
 **Audience:** a new Codex 5.6 Sol agent implementing the project.  
 **Owner:** Pysely contributors.
 **Prepared:** September 9, 2026.  

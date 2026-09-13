@@ -1,7 +1,7 @@
 """Stock-checker tests against the generated fixture schema.
 
-``test/fixtures/schema.py`` is generated from ``test/fixtures/tables.py`` by
-the same code path as the CLI (``test/codegen`` diffs it). Nothing here uses a
+``test/fixtures/schema.pyi`` is generated from ``test/fixtures/schema.py`` by
+the same code path as the CLI (``test/typgen`` diffs it). Nothing here uses a
 handwritten typed facade.
 """
 
@@ -110,10 +110,10 @@ def test_pyright_only_dynamic_alias_falls_back_to_object(tmp_path: Path) -> None
     target = tmp_path / "dynamic_alias.py"
     target.write_text(
         "from typing import assert_type\n"
-        "from pysely import Database\n"
+        ""
         "from test.fixtures.dialects import postgres_dialect\n"
-        "from test.fixtures.schema import schema\n"
-        "db = Database(schema=schema, dialect=postgres_dialect())\n"
+        "from test.fixtures.schema import DatabaseSchema\n"
+        "db = DatabaseSchema.connect(dialect=postgres_dialect())\n"
         "async def f(alias: str) -> None:\n"
         '    row = await db.select_from("person").select_as("first_name", alias)'
         ".execute_take_first_or_throw()\n"
@@ -279,9 +279,9 @@ class LanguageServer:
 
 PREFIX = (
     "from test.fixtures.dialects import postgres_dialect\n"
-    "from test.fixtures.schema import schema\n"
-    "from pysely import Database\n\n"
-    "db = Database(schema=schema, dialect=postgres_dialect())\n"
+    "from test.fixtures.schema import DatabaseSchema\n"
+    "\n"
+    "db = DatabaseSchema.connect(dialect=postgres_dialect())\n"
 )
 
 
@@ -360,4 +360,7 @@ def test_value_completions_after_a_join_are_a_superset(
         PREFIX + 'query = db.select_from("person")\nquery.where("status", "=", "")\n'
     )
     assert {"active", "inactive"} <= single
-    assert "dog" not in single
+    # Shared generic predicate signatures expose enum values from other value
+    # buckets in completion lists, even when that bucket's column type is Never.
+    # The negative fixture verifies those suggestions are still rejected.
+    assert "dog" in single

@@ -1,7 +1,7 @@
 """Write annotated table classes from a live database.
 
 ``pysely introspect`` reads the catalog and emits the same ``tables.py`` a user
-would write by hand, so ``pysely codegen`` and the rest of the pipeline do not
+would write by hand, so ``pysely typgen`` and the rest of the pipeline do not
 care where the tables came from. Connection details never reach the output.
 
 Nullability becomes ``X | None``. Defaults, generated columns, primary keys and
@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, cast
 
-from pysely.codegen import SchemaError
+from pysely.typgen import SchemaError
 
 Record = Mapping[str, Any]
 """A catalog row from a driver; drivers are untyped, so values are ``Any``."""
@@ -302,7 +302,8 @@ def render_tables(
     if imports:
         header += [*sorted(imports), ""]
     body = "\n\n\n".join(classes)
-    schema = [f"class {schema_class}:"] + [
+    header += ["from pysely import SchemaDefinition", ""]
+    schema = [f"class {schema_class}(SchemaDefinition):"] + [
         f"    {_attribute(table.name)}: {_class_name(table.name)}" for table in tables
     ]
     return "\n".join(header) + "\n" + body + "\n\n\n" + "\n".join(schema) + "\n"

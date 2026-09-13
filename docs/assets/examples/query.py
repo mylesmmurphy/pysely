@@ -1,9 +1,8 @@
-from schema import schema
+from schema import DatabaseSchema
 
 from playground import dialect
-from pysely import Database
 
-db = Database(schema=schema, dialect=dialect)
+db = DatabaseSchema.connect(dialect=dialect)
 
 # Try it: misspell a column, change "dog" to "bird", or select "id".
 query = (

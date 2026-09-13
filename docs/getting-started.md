@@ -2,18 +2,19 @@
 
 ## Install
 
-Install the development release with the driver extra for your database:
+These docs track the repository's `main` branch, including the new `typgen`
+command. Install that source with the driver extra for your database:
 
 === "uv"
 
     ```bash
-    uv add --prerelease allow "pysely[sqlite]"
+    uv add "pysely[sqlite] @ git+https://github.com/mylesmmurphy/pysely.git@main"
     ```
 
 === "pip"
 
     ```bash
-    pip install --pre "pysely[sqlite]"
+    pip install "pysely[sqlite] @ git+https://github.com/mylesmmurphy/pysely.git@main"
     ```
 
 Use `postgres` or `mysql` instead of `sqlite` for those databases. Pysely is
@@ -22,12 +23,13 @@ currently a pre-alpha development release.
 ## Define your database
 
 Use one annotated class per table and a database class mapping table names to
-those types. This is the only file you write by hand.
+those types. Keep schema definitions separate from connection setup.
 
 ```python
-# tables.py
+# dbschema.py
 from datetime import datetime
 from typing import Literal
+from pysely import SchemaDefinition
 
 
 class UserTable:
@@ -39,7 +41,7 @@ class UserTable:
     created_at: datetime
 
 
-class DatabaseSchema:
+class DatabaseSchema(SchemaDefinition):
     users: UserTable
 ```
 
@@ -48,11 +50,11 @@ class DatabaseSchema:
 Run the generator once, and again whenever the schema changes:
 
 ```bash
-pysely codegen tables.py --output schema.py
+pysely typgen dbschema.py
 ```
 
-`schema.py` is one self-contained module: your table classes, now typed.
-Commit it. See [Code generation](codegen.md).
+`dbschema.pyi` is an adjacent type-only interface. Commit it alongside your
+handwritten `dbschema.py`. See [Type generation](typgen.md).
 
 ## Connect and query
 
@@ -95,14 +97,13 @@ Commit it. See [Code generation](codegen.md).
     dialect = MysqlDialect(pool=pool)
     ```
 
-Pass the generated schema and the dialect to Pysely:
+Create the connected client in your application’s `db.py`:
 
 ```python
-from schema import schema
-from pysely import Database
+from dbschema import DatabaseSchema
 
 
-db = Database(schema=schema, dialect=dialect)
+db = DatabaseSchema.connect(dialect=dialect)
 rows = await (
     db.select_from("users")
     .select("id")
@@ -120,9 +121,9 @@ Pysely passes values to the driver separately from generated SQL.
 
 ### Without generation
 
-The same call with the hand-written `tables.DatabaseSchema` runs the same
-queries with runtime name validation only. No static checking; rows are
-`dict[str, object]`.
+Removing the stub does not change runtime behavior. The same handwritten
+schema and shared runtime still validate names and execute queries, but the
+schema-specific static checks are unavailable.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 

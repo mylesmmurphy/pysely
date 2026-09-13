@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Generic, Literal, Self, TypeAlias, TypeVar, cast, overload
+from typing import Any, Generic, Literal, Self, TypeAlias, TypeVar, cast
 from uuid import uuid4
 
 from pysely.errors import InvalidQueryError, NoResultError
@@ -20,15 +20,12 @@ from pysely.operation_node import (
 )
 from pysely.query_compiler import CompiledQuery
 from pysely.query_executor import QueryExecutor
-from pysely.row import Cons, Row
 from pysely.schema import Schema, table_node
 
 DatabaseT = TypeVar("DatabaseT")
 ScopeT = TypeVar("ScopeT")
 ColumnsT = TypeVar("ColumnsT", bound=str)
 RowT = TypeVar("RowT")
-FieldsT = TypeVar("FieldsT")
-StarT = TypeVar("StarT", bound=str)
 SchemaComparisonOperator: TypeAlias = Literal[
     "=",
     "!=",
@@ -101,9 +98,6 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
     _schema: Schema
     _scope: dict[str, str]
     _query_id: str
-    _builder_type: type[ExpressionBuilder[Any]] | None = None
-    """Set by a generated client: rows become :class:`Row` and callbacks get
-    the schema's expression builder. Unset, rows are plain dictionaries."""
 
     @classmethod
     def from_name(cls, name: str, executor: QueryExecutor, schema: Schema) -> Self:
@@ -115,15 +109,8 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
             uuid4().hex,
         )
 
-    def typed(self, builder_type: type[ExpressionBuilder[Any]]) -> Self:
-        """Return :class:`Row` results and use a generated expression builder."""
-        return replace(self, _builder_type=builder_type)
-
     def _builder(self, scope: dict[str, str]) -> ExpressionBuilder[Any]:
-        builder_type: type[ExpressionBuilder[Any]] = (
-            self._builder_type or ExpressionBuilder
-        )
-        return builder_type(self._schema, scope)
+        return ExpressionBuilder(self._schema, scope)
 
     def select(
         self, selections: str | Sequence[str]
@@ -281,9 +268,7 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
 
     async def execute(self) -> list[RowT]:
         result = await self._executor.execute_query(self._node, self._query_id)
-        if self._builder_type is None:
-            return cast(list[RowT], list(result.rows))
-        return cast(list[RowT], [Row(row) for row in result.rows])
+        return cast(list[RowT], list(result.rows))
 
     async def execute_take_first(self) -> RowT | None:
         rows = await self.execute()
@@ -294,113 +279,3 @@ class SchemaQueryBuilder(Generic[DatabaseT, ScopeT, RowT]):
         if row is None:
             raise NoResultError("Query returned no rows")
         return row
-
-
-@dataclass(frozen=True)
-class TypedSchemaQueryBuilder(Generic[DatabaseT, ColumnsT, FieldsT, StarT]):
-    """Base of a generated query class.
-
-    The generated subclass adds column-aware overloads for the public methods
-    and routes them through the underscore methods here, which keep the
-    runtime builder as the single implementation. ``FieldsT`` and ``StarT``
-    are the type arguments of the :class:`Row` the query returns.
-    """
-
-    _query: SchemaQueryBuilder[DatabaseT, object, Row[FieldsT, StarT]]
-
-    def select(
-        self, selections: ColumnsT | Sequence[ColumnsT]
-    ) -> TypedSchemaQueryBuilder[
-        DatabaseT, ColumnsT, Cons[str, object, FieldsT], StarT
-    ]:
-        values = cast(str | Sequence[str], selections)
-        return cast(
-            TypedSchemaQueryBuilder[
-                DatabaseT, ColumnsT, Cons[str, object, FieldsT], StarT
-            ],
-            replace(self, _query=self._query.select(values)),
-        )
-
-    def _select_as(self, source: ColumnsT, alias: str) -> Self:
-        return replace(self, _query=self._query.select_as(source, alias))
-
-    @overload
-    def where(
-        self, column: ColumnsT, operator: SchemaComparisonOperator, value: object
-    ) -> Self: ...
-
-    @overload
-    def where(
-        self, column: Callable[[ExpressionBuilder[ColumnsT]], Expression[bool]]
-    ) -> Self: ...
-
-    def where(
-        self,
-        column: ColumnsT | Callable[[ExpressionBuilder[ColumnsT]], Expression[bool]],
-        operator: SchemaComparisonOperator | None = None,
-        value: object = None,
-    ) -> Self:
-        if callable(column):
-            return replace(self, _query=self._query.where(cast(Any, column)))
-        if operator is None:
-            raise TypeError("where() requires an operator and value")
-        return replace(self, _query=self._query.where(column, operator, value))
-
-    def where_ref(
-        self, left: ColumnsT, operator: ReferenceOperator, right: ColumnsT
-    ) -> Self:
-        return replace(self, _query=self._query.where_ref(left, operator, right))
-
-    def _join(self, kind: JoinKind, table: str, left: str, right: str) -> Self:
-        return replace(self, _query=self._query.join(kind, table, left, right))
-
-    def group_by(self, columns: ColumnsT | Sequence[ColumnsT]) -> Self:
-        values = cast(str | Sequence[str], columns)
-        return replace(self, _query=self._query.group_by(values))
-
-    def _having(self, column: ExpressionCallback) -> Self:
-        return replace(self, _query=self._query.having(column))
-
-    def _order_by(self, column: str, direction: OrderDirection = "asc") -> Self:
-        return replace(self, _query=self._query.order_by(column, direction))
-
-    def limit(self, count: int) -> Self:
-        return replace(self, _query=self._query.limit(count))
-
-    def offset(self, count: int) -> Self:
-        return replace(self, _query=self._query.offset(count))
-
-    def _set_operation(
-        self,
-        operator: SetOperator,
-        other: TypedSchemaQueryBuilder[Any, Any, FieldsT, StarT],
-    ) -> Self:
-        return replace(self, _query=self._query.set_operation(operator, other._query))
-
-    def union(self, other: TypedSchemaQueryBuilder[Any, Any, FieldsT, StarT]) -> Self:
-        return self._set_operation("union", other)
-
-    def union_all(
-        self, other: TypedSchemaQueryBuilder[Any, Any, FieldsT, StarT]
-    ) -> Self:
-        return self._set_operation("union all", other)
-
-    def intersect(
-        self, other: TypedSchemaQueryBuilder[Any, Any, FieldsT, StarT]
-    ) -> Self:
-        return self._set_operation("intersect", other)
-
-    def except_(self, other: TypedSchemaQueryBuilder[Any, Any, FieldsT, StarT]) -> Self:
-        return self._set_operation("except", other)
-
-    def compile(self) -> CompiledQuery[Row[FieldsT, StarT]]:
-        return self._query.compile()
-
-    async def execute(self) -> list[Row[FieldsT, StarT]]:
-        return await self._query.execute()
-
-    async def execute_take_first(self) -> Row[FieldsT, StarT] | None:
-        return await self._query.execute_take_first()
-
-    async def execute_take_first_or_throw(self) -> Row[FieldsT, StarT]:
-        return await self._query.execute_take_first_or_throw()

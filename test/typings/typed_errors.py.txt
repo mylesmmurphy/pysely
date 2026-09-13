@@ -7,11 +7,10 @@ not spill onto neighbours.
 
 from typing import LiteralString, assert_type
 
-from pysely import Database
 from test.fixtures.dialects import postgres_dialect
-from test.fixtures.schema import schema
+from test.fixtures.schema import DatabaseSchema
 
-db = Database(schema=schema, dialect=postgres_dialect())
+db = DatabaseSchema.connect(dialect=postgres_dialect())
 person = db.select_from("person")
 joined = person.inner_join("pet", "owner_id", "person.id")
 

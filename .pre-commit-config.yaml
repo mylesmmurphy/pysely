@@ -1,12 +1,11 @@
 repos:
   - repo: local
     hooks:
-      - id: pysely-codegen
-        name: pysely codegen
+      - id: pysely-typgen
+        name: pysely typgen
         description: Regenerate the playground's typed interface from its schema.
         entry: >-
-          uv run pysely codegen docs/assets/examples/tables.py
-          --output docs/assets/examples/schema.py
+          uv run pysely typgen docs/assets/examples/schema.py
         language: system
         pass_filenames: false
         files: ^docs/assets/examples/(schema|database)\.py$

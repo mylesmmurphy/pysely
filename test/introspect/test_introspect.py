@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from pysely.codegen import SchemaError, generate
 from pysely.introspect import (
     MYSQL_TYPES,
     POSTGRES_TYPES,
@@ -18,6 +17,7 @@ from pysely.introspect import (
     parse_overrides,
     render_tables,
 )
+from pysely.typgen import SchemaError, generate
 
 ROOT = Path(__file__).parents[2]
 
@@ -66,7 +66,8 @@ def test_sqlite_introspection_reads_types_nullability_and_keys(tmp_path: Path) -
     assert "    owner_id: int  # references person.id" in source
     assert "    born: str | None" in source
     assert source.endswith(
-        "class DatabaseSchema:\n    person: PersonTable\n    pet: PetTable\n"
+        "class DatabaseSchema(SchemaDefinition):\n"
+        "    person: PersonTable\n    pet: PetTable\n"
     )
     # The output feeds the generator unchanged.
     generated = generate(source)
@@ -162,10 +163,10 @@ def test_cli_writes_tables_from_sqlite_without_credentials(tmp_path: Path) -> No
             sys.executable,
             "-m",
             "pysely.cli",
-            "codegen",
+            "typgen",
             str(output),
             "-o",
-            str(tmp_path / "schema.py"),
+            str(tmp_path / "tables.pyi"),
         ],
         capture_output=True,
         text=True,

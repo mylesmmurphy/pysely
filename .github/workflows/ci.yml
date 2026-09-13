@@ -21,10 +21,8 @@ jobs:
       - run: uv run ruff format --check .
       - name: Generated interface is up to date
         run: >-
-          uv run pysely codegen docs/assets/examples/tables.py
-          --output docs/assets/examples/schema.py --check
-          && uv run pysely codegen test/fixtures/tables.py
-          --output test/fixtures/schema.py --check
+          uv run pysely typgen docs/assets/examples/schema.py --check
+          && uv run pysely typgen test/fixtures/schema.py --check
       - run: uv run mypy src/pysely test/fixtures/generated.py test/fixtures/schema.py
       - run: MYPYPATH=. uv run mypy --strict test/typings/portable.py test/typings/typed_queries.py
       - run: uv run pyright

@@ -4,8 +4,8 @@ import traceback
 import types
 
 from pysely import Dialect
-from pysely.codegen import generate
 from pysely.query_compiler import BindingProfile
+from pysely.typgen import generate
 
 SQL_CLAUSES = (
     "delete from",
@@ -104,13 +104,15 @@ def compilation_dialect(name):
 def evaluate_playground(tables_code, query_code, dialect_name):
     schema_code = ""
     try:
-        # Exactly what `pysely codegen` writes for these tables. The playground
+        # Exactly what `pysely typgen` writes for these tables. The playground
         # runs the real generator so the typed schema always matches the
         # tables editor rather than a file baked in at build time.
-        schema_code = generate(tables_code, output="schema.py")
+        schema_code = generate(
+            tables_code, source_name="schema.py", output="schema.pyi"
+        )
         schema = types.ModuleType("schema")
         sys.modules["schema"] = schema
-        exec(compile(schema_code, "schema.py", "exec"), schema.__dict__)
+        exec(compile(tables_code, "schema.py", "exec"), schema.__dict__)
         environment = types.ModuleType("playground")
         environment.dialect = compilation_dialect(dialect_name)
         sys.modules["playground"] = environment

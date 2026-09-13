@@ -101,7 +101,7 @@ Install only the driver needed by the application.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 
-[← Code generation](codegen.md){ .md-button }
+[← Type generation](typgen.md){ .md-button }
 [Project status →](project-status.md){ .md-button .md-button--primary }
 
 </nav>

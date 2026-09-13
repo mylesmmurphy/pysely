@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 const prefix = `from typing import cast
-from pysely import Database
 from pysely.dialect import Dialect
-from schema import schema
+from schema import DatabaseSchema
 
 dialect = cast(Dialect, globals()["dialect"])
-db = Database(schema=schema, dialect=dialect)
+db = DatabaseSchema.connect(dialect=dialect)
 `;
 
 async function replaceQuery(page: import("@playwright/test").Page, code: string) {
@@ -248,20 +247,19 @@ test("regenerates the typed schema from the tables editor", async ({ page }) => 
   await expect(page.locator("#playground-status")).toHaveText("Compiled", { timeout: 40_000 });
 
   // A column added in the tables editor must become usable in the query editor
-  // without a rebuild: the playground runs `pysely codegen` on every run.
+  // without a rebuild: the playground runs `pysely typgen` on every run.
   await page.evaluate(() => {
     const monaco = (window as any).monaco;
-    const tables = monaco.editor.getModel(monaco.Uri.parse("file:///workspace/tables.py"));
+    const tables = monaco.editor.getModel(monaco.Uri.parse("file:///workspace/schema.py"));
     tables.setValue(tables.getValue().replace("    last_name: str | None\n", "    last_name: str | None\n    nickname: str | None\n"));
   });
   await page.evaluate(code => {
     const monaco = (window as any).monaco;
     monaco.editor.getModel(monaco.Uri.parse("file:///workspace/query.py")).setValue(code);
-  }, `from schema import schema
+  }, `from schema import DatabaseSchema
 from playground import dialect
-from pysely import Database
 
-db = Database(schema=schema, dialect=dialect)
+db = DatabaseSchema.connect(dialect=dialect)
 compiled = db.select_from("person").select("nickname").compile()
 `);
 
@@ -284,7 +282,7 @@ test("shows the generated module in an output tab", async ({ page }) => {
   await page.locator("#playground-tab-generated").click();
   await expect(page.locator("#playground-generated")).toBeVisible();
   await expect(page.locator("#playground-sql")).toBeHidden();
-  await expect(page.locator("#playground-generated-code")).toContainText("class DatabaseSchema(GeneratedSchema[DatabaseClient]):");
+  await expect(page.locator("#playground-generated-code")).toContainText("class DatabaseSchema(SchemaDefinition):");
   // Read-only views are static: only the two editable panes are Monaco editors,
   // but both views are syntax highlighted.
   expect(await page.evaluate(() => (window as any).monaco.editor.getEditors().length)).toBe(2);

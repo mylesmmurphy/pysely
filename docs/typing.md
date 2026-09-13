@@ -5,7 +5,7 @@ Two layers, one source of truth:
 | Layer | Source | What it does |
 | --- | --- | --- |
 | Runtime | your table classes | validates table and column names when a query is built |
-| Static | `schema.py`, generated from those classes | lets mypy and Pyright check queries and complete names |
+| Static | `schema.pyi`, generated beside the handwritten schema | lets mypy and Pyright check queries and complete names |
 
 No checker plugin. Both checkers read ordinary annotations.
 
@@ -31,17 +31,17 @@ checked statically; rows are `dict[str, object]`.
 
 ## Static checking
 
-Run [code generation](codegen.md) and import the result:
+Define your schema with `SchemaDefinition` as shown in [type generation](typgen.md),
+generate its stub, and import the handwritten schema normally:
 
 ```bash
-pysely codegen tables.py --output schema.py
+pysely typgen schema.py
 ```
 
 ```python
-from schema import schema
-from pysely import Database
+from schema import DatabaseSchema
 
-db = Database(schema=schema, dialect=dialect)
+db = DatabaseSchema.connect(dialect=dialect)
 ```
 
 Each line below is covered by a test that runs stock mypy 1.20 and Pyright
@@ -52,7 +52,7 @@ Each line below is covered by a test that runs stock mypy 1.20 and Pyright
 | Table and column completion, in scope only | Verified |
 | Unknown, unjoined or ambiguous columns in `select`, `select_as`, `where`, `where_ref`, `group_by`, `having`, `order_by`, joins and callbacks | Error |
 | `where` values checked per operator family (see below); `having` takes the callback form | Verified |
-| Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | Verified for the first 16 fields |
+| Result rows: `row["id"]` is `int`, `row["kind"]` is the enum, unknown keys are errors | 64-field lookup capacity; 50-field mixed projections regression-tested |
 | `select_as` alias typed as a key; `order_by` accepts selected aliases | Verified for a literal alias (aliases: first 8 fields) |
 | Left join: the joined table's keys become `X \| None` | Verified |
 | Right and full join: every key becomes `X \| None` | Verified (conservative) |
@@ -87,22 +87,24 @@ The same rules apply inside `where(lambda eb: ...)`; `eb.and_`, `eb.or_`,
 
 ## Rows
 
-Typed queries return `pysely.Row` instances: immutable mappings whose static
-type lists the selected fields newest first
-(`Row[Cons[Literal["id"], int, Cons[Literal["name"], str, Nil]], Never]`).
-Lookups are typed for the 16 most recent fields; beyond that a key reads as
-`object`. `dict(row)` and `**row` do not type-check because the row rejects
-unknown keys statically; use `row.to_dict()`. Selecting the same output name
-twice is a runtime error (`select_as` to disambiguate); statically the newer
-field wins.
+Typed queries return `pysely.FlatRow`: immutable mappings with a flat pack of
+`Field[key, value]` types, newest first. There is no nested cons-list limit.
+The shared row stub provides exact lookup for the 64 most recent selections;
+older keys must be accessed through `to_dict()` (they are not silently `Any`).
+`get()` permits unknown keys, as ordinary mappings do. Duplicate aliases use
+the latest field type; runtime duplicate-output validation remains unchanged.
 
 ## Query classes
 
 `select_from("person")` returns `PersonQuery`, which only carries that table's
 overloads, so single-table completions stay fast however large the schema.
-Any join returns `DatabaseQuery`, which carries every table's overloads; its
+Predicates and callbacks share generic value-family signatures. Any join returns
+`DatabaseQuery`; exact `select` still carries per-column overloads, so its
 completion latency grows with the total column count (see
 [Performance](#performance)).
+
+Enum value completions can include values from other schema columns, even on
+single-table queries. Invalid values still produce mypy/Pyright errors.
 
 ## Known boundaries
 
@@ -125,27 +127,31 @@ Each has a reproducer in `test/typings`.
   `list[str]` for a list literal.
 - **Dynamic table names** (`select_from(table)` with `table: str`) are a
   static error; use the untyped `Pysely` client for those.
-- **Helpers** take the concrete query class (`PersonQuery[FieldsT]`) or name
-  the joined tables (`DatabaseQuery[Literal["person", "pet"], PersonScope |
-  PetScope, NullT, FieldsT, StarT]`); `ColumnT | PersonColumns`-style
-  parameters are solved inconsistently by the two checkers.
-- **mypy time** grows with row depth: a lookup on a row with 16 fields takes
-  about two seconds in mypy 1.20. Pyright is unaffected.
+- **Helpers** can preserve the flat pack using `TypeVarTuple` and
+  `PersonQuery[*FieldsT]`. Generated query class names are type-only: import
+  them under `TYPE_CHECKING` and use postponed annotations.
+- **Wide rows** have exact lookup capacity for 64 selections. The regression
+  suite checks every key and type in a mixed 50-column projection.
 
 ## Performance
 
-Measured with `scripts/benchmark_typing.py` on synthetic schemas (10-30
-columns per table, six shared column names); full table in
-[ADR 0006](adr/0006-generated-typed-interfaces.md). In short: Pyright
-re-evaluates every reachable class on each edit, so completion latency grows
-with the generated module. Single-table completions stay under 300 ms up to
-about 20 tables and reach 1.5 s at 60; joined-query completions are 1.9 s at
-20 tables. Pyright refuses modules past roughly 80 tables; split larger
-databases into several database classes.
+The stub backend still has a real bottleneck: exact `select` overloads.
+On the representative 20-table/333-column schema, the September 12 local run
+produced a 582,755-byte stub (previous output was about 1.3 MB). Three edit rounds
+gave median select completion times of 106 ms single-table, 715 ms with two
+tables, and 1,070 ms with three. Cold checks across the benchmark's query/projection
+fixtures took 6.16 s in Pyright and 53.18 s in mypy; warm mypy took 0.26 s.
+These are local measurements, not latency guarantees.
+
+Predicates now share one overload family per schema value type. Result fields
+are flat rather than recursively nested. Neither change eliminates the
+per-column exact projection work; optimizing that remains separate.
+Reproduce with `uv run python scripts/benchmark_typing.py --tables 20 --rounds 3`.
+Historical measurements in ADR 0006 describe the old backend.
 
 <nav class="pysely-page-nav" aria-label="Page navigation" markdown="1">
 
 [← Queries](queries.md){ .md-button }
-[Code generation →](codegen.md){ .md-button .md-button--primary }
+[Type generation →](typgen.md){ .md-button .md-button--primary }
 
 </nav>

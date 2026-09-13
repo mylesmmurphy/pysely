@@ -14,9 +14,10 @@ literal completion.
 Database introspection is not implemented. Arbitrary projection aliases and some
 column-to-value relationships remain beyond the portable contract.
 
-Superseded in part by [ADR 0006](0006-generated-typed-interfaces.md): the typed
-entry points are now written by `pysely codegen`, and the optional `pysely.mypy`
-plugin has been removed in favour of generated source that both checkers read.
+Superseded by [ADR 0007](0007-type-only-typgen.md), following
+[ADR 0006](0006-generated-typed-interfaces.md): `pysely typgen` now writes only
+adjacent `.pyi` stubs. No generated runtime client or checker plugin is required.
+The implementation and limitations described above are historical.
 
 The docs playground runs real Python compilation and stock browser-hosted Pyright.
 Its language intelligence must represent VS Code using the same public types and

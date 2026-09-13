@@ -17,6 +17,7 @@ from .errors import (
     UnsupportedFeatureError,
 )
 from .expression import AliasedExpression, Expression, and_, or_
+from .flat_row import Field, FlatRow
 from .pysely import Database, Pysely
 from .query_builder import (
     DeleteQueryBuilder,
@@ -29,14 +30,12 @@ from .query_builder import (
     SchemaComparisonOperator,
     SelectQueryBuilder,
     SetOperator,
-    TypedSchemaQueryBuilder,
     UpdateQueryBuilder,
     UpdateResult,
 )
 from .query_compiler import BindingProfile, CompiledQuery
 from .query_executor import QueryPlugin
-from .row import Cons, Nil, Row
-from .schema import GeneratedSchema
+from .schema_definition import SchemaDefinition
 
 __all__ = [
     "AliasedExpression",
@@ -44,21 +43,20 @@ __all__ = [
     "ClosedClientError",
     "Column",
     "CompiledQuery",
-    "Cons",
     "Database",
     "DeleteQueryBuilder",
     "DeleteResult",
     "Dialect",
     "Expression",
     "ExpressionBuilder",
-    "GeneratedSchema",
+    "Field",
+    "FlatRow",
     "InsertQueryBuilder",
     "InsertResult",
     "InvalidQueryError",
     "MssqlDialect",
     "MysqlDialect",
     "MysqlDriver",
-    "Nil",
     "NoResultError",
     "OrderDirection",
     "PGliteDialect",
@@ -68,13 +66,12 @@ __all__ = [
     "PyselyError",
     "QueryPlugin",
     "ReferenceOperator",
-    "Row",
     "SchemaComparisonOperator",
+    "SchemaDefinition",
     "SelectQueryBuilder",
     "SetOperator",
     "SqliteDialect",
     "Table",
-    "TypedSchemaQueryBuilder",
     "UnsupportedFeatureError",
     "UpdateQueryBuilder",
     "UpdateResult",

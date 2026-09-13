@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from pysely.codegen import generate
+from pysely.typgen import generate
 
 ROOT = Path(__file__).parents[1]
 SHARED = ["id", "name", "created_at", "updated_at", "status", "owner_id"]
@@ -46,6 +46,7 @@ def synthetic_schema(tables: int) -> str:
         "from datetime import date, datetime",
         "from decimal import Decimal",
         "from typing import Literal",
+        "from pysely import SchemaDefinition",
         "",
         "",
     ]
@@ -64,7 +65,7 @@ def synthetic_schema(tables: int) -> str:
             lines.append(f"    {name}: {annotation}")
         lines.append("")
         lines.append("")
-    lines.append("class DatabaseSchema:")
+    lines.append("class DatabaseSchema(SchemaDefinition):")
     lines += [f"    t{index}: Table{index}" for index in range(tables)]
     lines.append("")
     return "\n".join(lines)
@@ -73,10 +74,10 @@ def synthetic_schema(tables: int) -> str:
 def queries(tables: int) -> dict[str, str]:
     """Representative editor buffers; `""` marks the completion cursor."""
     prefix = (
-        "from schema import schema\n"
-        "from pysely import Database, Dialect\n"
+        "from schema import DatabaseSchema\n"
+        "from pysely import Dialect\n"
         "from pysely.query_compiler import BindingProfile\n\n"
-        'db = Database(schema=schema, dialect=Dialect(BindingProfile("b", "?")))\n'
+        'db = DatabaseSchema.connect(dialect=Dialect(BindingProfile("b", "?")))\n'
     )
     last = tables - 1
     single = prefix + 'q = db.select_from("t0").select("")\n'
@@ -101,10 +102,10 @@ def projection_query(width: int) -> str:
         for column in range(width)
     )
     return (
-        "from schema import schema\n"
-        "from pysely import Database, Dialect\n"
+        "from schema import DatabaseSchema\n"
+        "from pysely import Dialect\n"
         "from pysely.query_compiler import BindingProfile\n\n"
-        'db = Database(schema=schema, dialect=Dialect(BindingProfile("b", "?")))\n'
+        'db = DatabaseSchema.connect(dialect=Dialect(BindingProfile("b", "?")))\n'
         f'q = db.select_from("t0"){selects}\n'
         "async def main() -> None:\n"
         "    row = await q.execute_take_first_or_throw()\n"
@@ -254,11 +255,11 @@ class LanguageServer:
 
 def benchmark(tables: int, rounds: int) -> dict[str, Any]:
     workdir = Path(tempfile.mkdtemp(prefix=f"pysely-bench-{tables}-"))
-    (workdir / "tables.py").write_text(synthetic_schema(tables))
+    (workdir / "schema.py").write_text(synthetic_schema(tables))
     start = time.perf_counter()
-    generated = generate((workdir / "tables.py").read_text(), output="schema.py")
+    generated = generate((workdir / "schema.py").read_text(), output="schema.pyi")
     generation = time.perf_counter() - start
-    (workdir / "schema.py").write_text(generated)
+    (workdir / "schema.pyi").write_text(generated)
     (workdir / "pyrightconfig.json").write_text(
         json.dumps({"extraPaths": [str(ROOT / "src")], "typeCheckingMode": "standard"})
     )
@@ -325,7 +326,7 @@ def benchmark(tables: int, rounds: int) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tables", type=int, nargs="+", default=[20, 100, 300])
+    parser.add_argument("--tables", type=int, nargs="+", default=[20, 60, 100])
     parser.add_argument("--rounds", type=int, default=10)
     arguments = parser.parse_args()
     pyright = subprocess.run(

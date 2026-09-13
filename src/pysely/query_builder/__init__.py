@@ -4,7 +4,6 @@ from .schema_query_builder import (
     ReferenceOperator,
     SchemaComparisonOperator,
     SetOperator,
-    TypedSchemaQueryBuilder,
 )
 from .select_query_builder import SelectQueryBuilder
 from .write_query_builder import (
@@ -27,7 +26,6 @@ __all__ = [
     "SchemaComparisonOperator",
     "SelectQueryBuilder",
     "SetOperator",
-    "TypedSchemaQueryBuilder",
     "UpdateQueryBuilder",
     "UpdateResult",
 ]
